@@ -229,17 +229,21 @@ export class GameGateway
     const { user } = socket.request;
     const newNamespace = socket.nsp;
 
+    this.logger.log(`USEJOBS 1. 발생`);
+
     const { playerSum, count } = await this.gameEventService.setPlayerCheckNum(
       roomId,
       user,
     );
+
+    this.logger.log(`USEJOBS 2. 총 인원 : ${playerSum}, 카운트${count}`);
 
     if (playerSum === count) {
       await this.gameEventService.delPlayerNum(roomId);
 
       const status = await this.gameEventService.useState(roomId);
 
-      this.logger.log(`USEJOBS 의사, 마피아 능력사용 `);
+      this.logger.log(`USEJOBS 3. 의사, 마피아 능력사용`);
       this.logger.log(status);
 
       this.server
@@ -309,6 +313,11 @@ export class GameGateway
       await this.gameEventService.delNum(roomId);
 
       const result = await this.gameEventService.sortfinishVote(roomId);
+
+      //동률일 경우.
+      if (result.voteResult && result.result) {
+        await this.gameEventService.delValue(roomId, FINISH_VOTE_FIELD);
+      }
 
       this.logger.log(`FINISHV 값 형태`);
       // this.logger.log(result); //null일 경우 logger 안 됨
