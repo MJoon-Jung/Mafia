@@ -99,8 +99,7 @@ export class GameEventService {
 
     const jobData = [cr, mafia, doctor, police];
 
-    this.logger.log('jobData');
-    this.logger.log(jobData);
+    this.logger.log(`jobData ${jobData}`);
     return jobData;
   }
 
