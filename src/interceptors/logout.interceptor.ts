@@ -20,7 +20,7 @@ export class LogoutInterceptor implements NestInterceptor {
 
     return next
       .handle()
-      .pipe(tap(() => request.logout()))
+      .pipe(tap(() => request.logout((err) => console.error(err))))
       .pipe(tap(() => (request.session.cookie.maxAge = 0)));
   }
 }
