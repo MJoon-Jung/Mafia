@@ -423,7 +423,7 @@ export class GameGateway
     this.logger.log(
       `POLICE 능력으로 알아낸 ${usePolice.user.nickname}유저의 ${usePolice.user.job} 값`,
     );
-    this.logger.log(usePolice);
+    this.logger.log(`${usePolice}`);
 
     this.server.to(socket.id).emit(GameEvent.POLICE, usePolice);
   }
@@ -436,7 +436,7 @@ export class GameGateway
     const mafias = await this.gameEventService.getMafiaSearch(roomId);
 
     this.logger.log(`MAFIASEARCH 값 형태`);
-    this.logger.log(mafias);
+    this.logger.log(`${mafias}`);
 
     this.server.to(socket.id).emit(GameEvent.MAFIASEARCH, { mafia: mafias });
   }
