@@ -212,7 +212,7 @@ export class GameEventService {
       FINISH_VOTE_FIELD,
     );
 
-    this.logger.log(votehumon);
+    this.logger.log(`${votehumon}`);
     this.logger.log(`EVENT getVoteDeath , 죽이려는 대상: ${votehumon[0]}`);
 
     return votehumon[0].userNum;
