@@ -12,11 +12,6 @@ import { HttpExceptionFilter } from './http-exception.filter';
 import cookieParser from 'cookie-parser';
 import session from 'express-session';
 import passport from 'passport';
-import * as winston from 'winston';
-import {
-  utilities as nestWinstonModuleUtilities,
-  WinstonModule,
-} from 'nest-winston';
 import helmet from 'helmet';
 import hpp from 'hpp';
 import Redis from 'ioredis';
@@ -30,24 +25,8 @@ import { RedisIoAdapter } from './shared/adapter/RedisIoAdapter';
 
 async function bootstrap() {
   //winston logger
-  const logger = WinstonModule.createLogger({
-    transports: [
-      new winston.transports.Console({
-        level: process.env.NODE_ENV === 'production' ? 'info' : 'silly',
-        format: winston.format.combine(
-          winston.format.timestamp(),
-          nestWinstonModuleUtilities.format.nestLike('Mafia', {
-            prettyPrint: true,
-          }),
-        ),
-      }),
-    ],
-  });
 
-  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
-    logger,
-  });
-
+  const app = await NestFactory.create<NestExpressApplication>(AppModule);
   const configService = app.get(ConfigService);
   const PORT = process.env.PORT || 3065;
 
