@@ -315,7 +315,7 @@ export class GameGateway
       const result = await this.gameEventService.sortfinishVote(roomId);
 
       //동률일 경우.
-      if (result.voteResult && result.result) {
+      if (!result.result) {
         await this.gameEventService.delValue(roomId, FINISH_VOTE_FIELD);
       }
 
@@ -346,7 +346,7 @@ export class GameGateway
     // 여기서 true값만 넣도록 처리되어 있음.
     if (count > playerSum) return null;
 
-    this.logger.log(`PUNISH , 선택 값 : ${data.punish}`);
+    // this.logger.log(`PUNISH , 선택 값 : ${data.punish}`);
     if (data.punish) {
       await this.gameEventService.setPunish(roomId, data.punish);
     }

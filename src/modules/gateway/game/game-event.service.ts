@@ -1,5 +1,5 @@
 import { Injectable, Logger, Inject } from '@nestjs/common';
-import { MessageBody, WsException } from '@nestjs/websockets';
+import { WsException } from '@nestjs/websockets';
 import { Player } from 'src/modules/game-room/dto/player';
 import { RedisService } from 'src/modules/redis/redis.service';
 import { UserProfile } from '../../user/dto/user-profile.dto';
@@ -213,6 +213,8 @@ export class GameEventService {
 
     this.logger.log(`${votehumon}`);
     this.logger.log(`EVENT getVoteDeath , 죽이려는 대상: ${votehumon[0]}`);
+
+    if (!votehumon) return null;
 
     return votehumon[0].userNum;
   }
@@ -479,9 +481,9 @@ export class GameEventService {
     }
     const playerSum = players.length - (playerDie.length + playerLeave.length);
 
-    this.logger.log(
-      `EVENT setPlayerCheckNum, 총 인원 ${players.length}, 죽은 유저 수: ${playerDie.length}, 떠난 유저 수: ${playerLeave.length}`,
-    );
+    // this.logger.log(
+    //   `EVENT setPlayerCheckNum, 총 인원 ${players.length}, 죽은 유저 수: ${playerDie.length}, 떠난 유저 수: ${playerLeave.length}`,
+    // );
 
     return { playerSum: playerSum, count: count };
   }
@@ -522,7 +524,7 @@ export class GameEventService {
 
     const playerSum = players.length - (playerDie.length - playerLeave.length);
 
-    this.logger.log(`EVENT CheckNum, 총 인원 ${playerSum},  count ${count}`);
+    // this.logger.log(`EVENT CheckNum, 총 인원 ${playerSum},  count ${count}`);
 
     return { playerSum: playerSum, count: count };
   }
