@@ -75,6 +75,10 @@ export class GameGateway
     const { playerSum, count } =
       await this.gameEventService.setPlayerCheckNumExceptLeave(roomId, user);
 
+    this.logger.log(
+      `GATEWAY[TIMER] setPlayerCheckNumExceptLeave, 총 인원 ${playerSum},  count ${count}`,
+    );
+
     if (playerSum !== count) {
       return;
     }
@@ -134,6 +138,10 @@ export class GameGateway
 
     const { playerSum, count } =
       await this.gameEventService.setPlayerCheckNumExceptLeave(roomId, user);
+
+    this.logger.log(
+      `GATEWAY[DAY] setPlayerCheckNumExceptLeave, 총 인원 ${playerSum},  count ${count}`,
+    );
 
     if (playerSum === count) {
       this.logger.log(`현재 DAY  ${data.day}`);

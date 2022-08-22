@@ -502,10 +502,6 @@ export class GameEventService {
 
     const playerSum = players.length - playerLeave.length;
 
-    this.logger.log(
-      `EVENT setPlayerCheckNumExceptLeave, 총 인원 ${playerSum},  count ${count}`,
-    );
-
     return { playerSum: playerSum, count: count };
   }
 
