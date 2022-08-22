@@ -168,6 +168,7 @@ export class GameGateway
     const newNamespace = socket.nsp;
 
     const Players = await this.gameEventService.findPlayers(roomId);
+
     // if (gamePlayers.length < 6)
     //   //  throw new ForbiddenException()
     //   throw new ForbiddenException('인원이 부족합니다.');
@@ -187,8 +188,9 @@ export class GameGateway
         `START EVENT 발생  총 인원: ${Players.length} 카운팅 : ${count}`,
       );
       await this.gameEventService.delPlayerNum(roomId);
+      await this.gameEventService.setVotingStatus(roomId); //투표 유무
       this.logger.log(`START EVENT발생`);
-      this.logger.log(Players);
+
       // 비동기 신호
       setTimeout(() => {
         this.server
@@ -236,7 +238,7 @@ export class GameGateway
       user,
     );
 
-    this.logger.log(`USEJOBS 2. 총 인원 : ${playerSum}, 카운트${count}`);
+    this.logger.log(`USEJOBS 2. 총 인원 : ${playerSum}, 카운트 ${count}`);
 
     if (playerSum === count) {
       await this.gameEventService.delPlayerNum(roomId);
@@ -272,12 +274,14 @@ export class GameGateway
     // Todo 탈주/죽음/실존 플레이어 유효성 체크
     // Todo 죽은 사람을 투표 / 죽은 사람이 투표 유효성 체크 ok
     await this.gameEventService.voteValidation(roomId, data.vote);
+    await this.gameEventService.votingUpdate(roomId, user);
 
     if (count <= playerSum) {
       this.logger.log(`VOTE 투표값: ${data.vote}`);
       await this.gameEventService.setVote(roomId, data.vote);
     }
 
+    // 실시간 투표 결과
     const redisVote = {};
     const result = await this.gameEventService.getVote(roomId);
 
@@ -314,10 +318,12 @@ export class GameGateway
 
       const result = await this.gameEventService.sortfinishVote(roomId);
 
-      //동률일 경우.
+      //아무 지목도 없을 경우. 동률일 경우.
       if (!result.result) {
         await this.gameEventService.delValue(roomId, FINISH_VOTE_FIELD);
       }
+
+      await this.gameEventService.votingDefault(roomId);
 
       this.logger.log(`FINISHV 값 형태`);
       // this.logger.log(result); //null일 경우 logger 안 됨

@@ -1,0 +1,145 @@
+[1mdiff --git a/src/modules/game/dto/game-event.dto.ts b/src/modules/game/dto/game-event.dto.ts[m
+[1mdeleted file mode 100644[m
+[1mindex e69de29..0000000[m
+[1mdiff --git a/src/modules/gateway/game/constants/game-redis-key-prefix.ts b/src/modules/gateway/game/constants/game-redis-key-prefix.ts[m
+[1mindex a031298..8df9d2d 100644[m
+[1m--- a/src/modules/gateway/game/constants/game-redis-key-prefix.ts[m
+[1m+++ b/src/modules/gateway/game/constants/game-redis-key-prefix.ts[m
+[36m@@ -16,3 +16,5 @@[m [mexport const DAY_FIELD = 'day';[m
+ export const MAFIAS_FIELD = 'mafias';[m
+ export const EXLEAVE_FIELD = 'player-leave';[m
+ export const EXDIE_FIELD = 'player-die';[m
+[32m+[m
+[32m+[m[32mexport const VOTING_FIELD = 'voting';[m
+[1mdiff --git a/src/modules/gateway/game/game-event.service.ts b/src/modules/gateway/game/game-event.service.ts[m
+[1mindex 333f4ea..b25d1a0 100644[m
+[1m--- a/src/modules/gateway/game/game-event.service.ts[m
+[1m+++ b/src/modules/gateway/game/game-event.service.ts[m
+[36m@@ -24,7 +24,8 @@[m [mimport { EnumGameRole } from 'src/common/constants';[m
+ import { GameRepository } from 'src/modules/game/game.repository';[m
+ import 'dayjs/locale/ko';[m
+ import dayjs from 'dayjs';[m
+[31m-import { DAY_FIELD } from './constants/game-redis-key-prefix';[m
+[32m+[m[32mimport { DAY_FIELD, VOTING_FIELD } from './constants/game-redis-key-prefix';[m
+[32m+[m[32mimport { Voting } from '../../game/dto/voting';[m
+ dayjs.locale('ko');[m
+ [m
+ // 직업 부여 분리[m
+[36m@@ -710,6 +711,55 @@[m [mexport class GameEventService {[m
+     );[m
+   }[m
+ [m
+[32m+[m[32m  async setVotingStatus(roomId: number) {[m
+[32m+[m[32m    const players = await this.findPlayers(roomId);[m
+[32m+[m[32m    const voting: Voting[] = players.map((player) => new Voting(player));[m
+[32m+[m
+[32m+[m[32m    await this.redisService.hset([m
+[32m+[m[32m      this.makeGameKey(roomId),[m
+[32m+[m[32m      VOTING_FIELD,[m
+[32m+[m[32m      voting,[m
+[32m+[m[32m    );[m
+[32m+[m[32m  }[m
+[32m+[m
+[32m+[m[32m  async votingUpdate(roomId: number, user: UserProfile) {[m
+[32m+[m[32m    const voting = await this.getVotingStatus(roomId);[m
+[32m+[m
+[32m+[m[32m    // 현재 유저의 값이 true이면 에러[m
+[32m+[m[32m    // 현재 유저의 값이 false면 true로 변경[m
+[32m+[m[32m    voting.map((voter) => {[m
+[32m+[m[32m      if (voter.userId === user.id) {[m
+[32m+[m[32m        if (voter.vote === true)[m
+[32m+[m[32m          throw new WsException('투표할 수 없는 유저입니다.');[m
+[32m+[m[32m        else voter.vote = true;[m
+[32m+[m[32m      }[m
+[32m+[m[32m    });[m
+[32m+[m
+[32m+[m[32m    await this.redisService.hset([m
+[32m+[m[32m      this.makeGameKey(roomId),[m
+[32m+[m[32m      VOTING_FIELD,[m
+[32m+[m[32m      voting,[m
+[32m+[m[32m    );[m
+[32m+[m[32m  }[m
+[32m+[m
+[32m+[m[32m  async votingDefault(roomId: number) {[m
+[32m+[m[32m    const voting = await this.getVotingStatus(roomId);[m
+[32m+[m
+[32m+[m[32m    voting.map((player) => {[m
+[32m+[m[32m      player.vote = false;[m
+[32m+[m[32m    });[m
+[32m+[m
+[32m+[m[32m    await this.redisService.hset([m
+[32m+[m[32m      this.makeGameKey(roomId),[m
+[32m+[m[32m      VOTING_FIELD,[m
+[32m+[m[32m      voting,[m
+[32m+[m[32m    );[m
+[32m+[m[32m  }[m
+[32m+[m
+[32m+[m[32m  async getVotingStatus(roomId: number): Promise<Voting[]> {[m
+[32m+[m[32m    return await this.redisService.hget(this.makeGameKey(roomId), VOTING_FIELD);[m
+[32m+[m[32m  }[m
+[32m+[m
+   async getVote(roomId: number): Promise<number[]> {[m
+     return await this.redisService.hget(this.makeGameKey(roomId), VOTE_FIELD);[m
+   }[m
+[1mdiff --git a/src/modules/gateway/game/game.gateway.ts b/src/modules/gateway/game/game.gateway.ts[m
+[1mindex 5faf87c..e2217ee 100644[m
+[1m--- a/src/modules/gateway/game/game.gateway.ts[m
+[1m+++ b/src/modules/gateway/game/game.gateway.ts[m
+[36m@@ -168,6 +168,7 @@[m [mexport class GameGateway[m
+     const newNamespace = socket.nsp;[m
+ [m
+     const Players = await this.gameEventService.findPlayers(roomId);[m
+[32m+[m
+     // if (gamePlayers.length < 6)[m
+     //   //  throw new ForbiddenException()[m
+     //   throw new ForbiddenException('인원이 부족합니다.');[m
+[36m@@ -187,8 +188,9 @@[m [mexport class GameGateway[m
+         `START EVENT 발생  총 인원: ${Players.length} 카운팅 : ${count}`,[m
+       );[m
+       await this.gameEventService.delPlayerNum(roomId);[m
+[32m+[m[32m      await this.gameEventService.setVotingStatus(roomId); //투표 유무[m
+       this.logger.log(`START EVENT발생`);[m
+[31m-      this.logger.log(Players);[m
+[32m+[m
+       // 비동기 신호[m
+       setTimeout(() => {[m
+         this.server[m
+[36m@@ -236,7 +238,7 @@[m [mexport class GameGateway[m
+       user,[m
+     );[m
+ [m
+[31m-    this.logger.log(`USEJOBS 2. 총 인원 : ${playerSum}, 카운트${count}`);[m
+[32m+[m[32m    this.logger.log(`USEJOBS 2. 총 인원 : ${playerSum}, 카운트 ${count}`);[m
+ [m
+     if (playerSum === count) {[m
+       await this.gameEventService.delPlayerNum(roomId);[m
+[36m@@ -272,12 +274,14 @@[m [mexport class GameGateway[m
+     // Todo 탈주/죽음/실존 플레이어 유효성 체크[m
+     // Todo 죽은 사람을 투표 / 죽은 사람이 투표 유효성 체크 ok[m
+     await this.gameEventService.voteValidation(roomId, data.vote);[m
+[32m+[m[32m    await this.gameEventService.votingUpdate(roomId, user);[m
+ [m
+     if (count <= playerSum) {[m
+       this.logger.log(`VOTE 투표값: ${data.vote}`);[m
+       await this.gameEventService.setVote(roomId, data.vote);[m
+     }[m
+ [m
+[32m+[m[32m    // 실시간 투표 결과[m
+     const redisVote = {};[m
+     const result = await this.gameEventService.getVote(roomId);[m
+ [m
+[36m@@ -314,11 +318,13 @@[m [mexport class GameGateway[m
+ [m
+       const result = await this.gameEventService.sortfinishVote(roomId);[m
+ [m
+[31m-      //동률일 경우.[m
+[32m+[m[32m      //아무 지목도 없을 경우. 동률일 경우.[m
+       if (!result.result) {[m
+         await this.gameEventService.delValue(roomId, FINISH_VOTE_FIELD);[m
+       }[m
+ [m
+[32m+[m[32m      await this.gameEventService.votingDefault(roomId);[m
+[32m+[m
+       this.logger.log(`FINISHV 값 형태`);[m
+       // this.logger.log(result); //null일 경우 logger 안 됨[m
+ [m

@@ -16,3 +16,5 @@ export const DAY_FIELD = 'day';
 export const MAFIAS_FIELD = 'mafias';
 export const EXLEAVE_FIELD = 'player-leave';
 export const EXDIE_FIELD = 'player-die';
+
+export const VOTING_FIELD = 'voting';

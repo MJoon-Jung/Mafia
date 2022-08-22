@@ -24,7 +24,8 @@ import { EnumGameRole } from 'src/common/constants';
 import { GameRepository } from 'src/modules/game/game.repository';
 import 'dayjs/locale/ko';
 import dayjs from 'dayjs';
-import { DAY_FIELD } from './constants/game-redis-key-prefix';
+import { DAY_FIELD, VOTING_FIELD } from './constants/game-redis-key-prefix';
+import { Voting } from '../../game/dto/voting';
 dayjs.locale('ko');
 
 // 직업 부여 분리
@@ -708,6 +709,55 @@ export class GameEventService {
       VOTE_FIELD,
       votes,
     );
+  }
+
+  async setVotingStatus(roomId: number) {
+    const players = await this.findPlayers(roomId);
+    const voting: Voting[] = players.map((player) => new Voting(player));
+
+    await this.redisService.hset(
+      this.makeGameKey(roomId),
+      VOTING_FIELD,
+      voting,
+    );
+  }
+
+  async votingUpdate(roomId: number, user: UserProfile) {
+    const voting = await this.getVotingStatus(roomId);
+
+    // 현재 유저의 값이 true이면 에러
+    // 현재 유저의 값이 false면 true로 변경
+    voting.map((voter) => {
+      if (voter.userId === user.id) {
+        if (voter.vote === true)
+          throw new WsException('투표할 수 없는 유저입니다.');
+        else voter.vote = true;
+      }
+    });
+
+    await this.redisService.hset(
+      this.makeGameKey(roomId),
+      VOTING_FIELD,
+      voting,
+    );
+  }
+
+  async votingDefault(roomId: number) {
+    const voting = await this.getVotingStatus(roomId);
+
+    voting.map((player) => {
+      player.vote = false;
+    });
+
+    await this.redisService.hset(
+      this.makeGameKey(roomId),
+      VOTING_FIELD,
+      voting,
+    );
+  }
+
+  async getVotingStatus(roomId: number): Promise<Voting[]> {
+    return await this.redisService.hget(this.makeGameKey(roomId), VOTING_FIELD);
   }
 
   async getVote(roomId: number): Promise<number[]> {
