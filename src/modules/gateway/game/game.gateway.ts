@@ -73,10 +73,10 @@ export class GameGateway
     const newNamespace = socket.nsp;
 
     const { playerSum, count } =
-      await this.gameEventService.setPlayerCheckNumExceptLeave(roomId, user);
+      await this.gameEventService.setPlayerExceptLeaveDie(roomId, user);
 
     this.logger.log(
-      `GATEWAY[TIMER] setPlayerCheckNumExceptLeave, 총 인원 ${playerSum},  count ${count}`,
+      `GATEWAY[TIMER] setPlayerExceptLeaveDie, 총 인원 ${playerSum},  count ${count}`,
     );
 
     if (playerSum !== count) {
@@ -137,10 +137,10 @@ export class GameGateway
     const newNamespace = socket.nsp;
 
     const { playerSum, count } =
-      await this.gameEventService.setPlayerCheckNumExceptLeave(roomId, user);
+      await this.gameEventService.setPlayerExceptLeaveDie(roomId, user);
 
     this.logger.log(
-      `GATEWAY[DAY] setPlayerCheckNumExceptLeave, 총 인원 ${playerSum},  count ${count}`,
+      `GATEWAY[DAY] setPlayerExceptLeaveDie, 총 인원 ${playerSum},  count ${count}`,
     );
 
     if (playerSum === count) {
