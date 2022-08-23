@@ -488,9 +488,10 @@ export class GameEventService {
     return { playerSum: playerSum, count: count };
   }
 
-  async setPlayerCheckNumExceptLeave(roomId: number, user: UserProfile) {
+  async setPlayerExceptLeaveDie(roomId: number, user: UserProfile) {
     const players = await this.getPlayerJobs(roomId);
     const playerLeave = (await this.getLeave(roomId)) || [];
+    const playerDie = (await this.getDie(roomId)) || [];
 
     let count;
     for (const player of players) {
@@ -499,13 +500,13 @@ export class GameEventService {
         break;
       }
     }
-
-    const playerSum = players.length - playerLeave.length;
+    const playerSum = players.length - (playerDie.length + playerLeave.length);
+    // const playerSum = players.length - playerLeave.length;
 
     return { playerSum: playerSum, count: count };
   }
 
-  async CheckNum(roomId: number, user) {
+  async CheckNum(roomId: number, user: UserProfile) {
     const players = await this.getPlayerJobs(roomId);
     const playerDie = (await this.getDie(roomId)) || [];
     const playerLeave = (await this.getLeave(roomId)) || [];
@@ -518,7 +519,7 @@ export class GameEventService {
       }
     }
 
-    const playerSum = players.length - (playerDie.length - playerLeave.length);
+    const playerSum = players.length - (playerDie.length + playerLeave.length);
 
     // this.logger.log(`EVENT CheckNum, 총 인원 ${playerSum},  count ${count}`);
 
@@ -632,20 +633,18 @@ export class GameEventService {
   }
 
   async setLeave(roomId: number, player: Player) {
-    const dieUser = (await this.getLeave(roomId)) || [];
+    let dieUsers = (await this.getDie(roomId)) || [];
     const leaveusers = (await this.getLeave(roomId)) || [];
 
-    // for (let user = 0; user < dieUser.length; user++) {
-    //   if()
-    // }
+    // 중간에 나가는 플레이어가 죽은 유저에 있다면, 빼고 넣어주기
+    dieUsers = dieUsers.filter((die) => {
+      die.id === player.id;
+    });
 
     leaveusers.push(player);
 
-    return this.redisService.hset(
-      this.makeGameKey(roomId),
-      EXLEAVE_FIELD,
-      leaveusers,
-    );
+    this.redisService.hset(this.makeGameKey(roomId), EXDIE_FIELD, dieUsers);
+    this.redisService.hset(this.makeGameKey(roomId), EXLEAVE_FIELD, leaveusers);
   }
 
   async getLeave(roomId: number) {
