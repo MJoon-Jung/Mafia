@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { EnumGameRole } from 'src/common/constants';
+import { EnumGameRole, EnumGameTeam } from 'src/common/constants';
 import { ImageDto } from 'src/modules/user/dto';
 import { Member } from './member';
 
@@ -47,7 +47,7 @@ export class Player {
     example: 'maifa',
     description: '팀 상태',
   })
-  team: EnumGameRole | null;
+  team: EnumGameTeam | null;
 
   gameId: number | null;
 
@@ -61,5 +61,9 @@ export class Player {
     this.die = false;
     this.team = null;
     this.gameId = null;
+  }
+
+  public setDie(die: boolean) {
+    this.die = die;
   }
 }

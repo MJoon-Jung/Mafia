@@ -1,7 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRedis, Redis } from '@svtslv/nestjs-ioredis';
 import { KeyType, ValueType } from 'ioredis';
-import { ROOM_NUMBER } from '../gateway/game-room/constants';
 import { REDIS_GAME } from './redis-option';
 
 @Injectable()
@@ -20,7 +19,7 @@ export class RedisService {
     return await this.redis.hmget(key, fields);
   }
 
-  async hincrby(key: string, field: string) {
+  async hincrby(key: string, field: string): Promise<number> {
     return await this.redis.hincrby(key, field, 1);
   }
 
@@ -60,7 +59,7 @@ export class RedisService {
   }
 
   async incr() {
-    return await this.redis.incr(ROOM_NUMBER);
+    return await this.redis.incr('roomNumber');
   }
 
   // getBitpos() {

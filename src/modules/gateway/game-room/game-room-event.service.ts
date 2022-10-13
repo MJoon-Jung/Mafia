@@ -6,15 +6,7 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
-import {
-  GAME,
-  GameRoomEvent,
-  GAME_ROOM,
-  GAME_SOCKET_NAMESPACE,
-  INFO_FIELD,
-  MEMBER_FIELD,
-  PLAYER_FIELD,
-} from './constants';
+import { GameRoomEvent, GAME_SOCKET_NAMESPACE } from './constants';
 import {
   UpdateGameRoomDto,
   Member,
@@ -31,6 +23,8 @@ import { WsException } from '@nestjs/websockets';
 import { Player } from 'src/modules/game-room/dto/player';
 import { GameRepository } from 'src/modules/game/game.repository';
 import { CreateGameDto } from '../create-game.dto';
+import { RedisHashesKey } from 'src/modules/gateway/common/RedisHashesKey';
+import { RedisHashesField } from 'src/modules/gateway/common/RedisHashesField';
 
 @Injectable()
 export class GameRoomEventService {
@@ -119,7 +113,11 @@ export class GameRoomEventService {
   async join(roomId: number, member: Member): Promise<Member[]> {
     const members = await this.findMembersByRoomId(roomId);
     this.addMember(members, member);
-    await this.saveMembers(this.makeRoomKey(roomId), MEMBER_FIELD, members);
+    await this.saveMembers(
+      RedisHashesKey.game(roomId),
+      RedisHashesField.member(),
+      members,
+    );
 
     return members;
   }
@@ -141,8 +139,10 @@ export class GameRoomEventService {
   // 게임 방 번호로 모든 멤버 찾기
   async findMembersByRoomId(roomId: number): Promise<Member[]> {
     const members =
-      (await this.redisService.hget(this.makeRoomKey(roomId), MEMBER_FIELD)) ||
-      [];
+      (await this.redisService.hget(
+        RedisHashesKey.game(roomId),
+        RedisHashesField.member(),
+      )) || [];
 
     return members;
   }
@@ -152,7 +152,10 @@ export class GameRoomEventService {
 
     const result = await promiseAllSetteldResult(
       roomKeys.map(async (key) => {
-        const room: GameRoom = await this.redisService.hget(key, INFO_FIELD);
+        const room: GameRoom = await this.redisService.hget(
+          key,
+          RedisHashesField.roomInfo(),
+        );
         const members = await this.findMembersByRoomId(room.id);
         const gameRoom = new GameRoomWithMembers(room, members);
         return gameRoom;
@@ -184,11 +187,14 @@ export class GameRoomEventService {
 
   // 방 정보 찾기
   async findOneOfRoomInfo(roomId: number): Promise<GameRoom> {
-    return await this.redisService.hget(this.makeRoomKey(roomId), INFO_FIELD);
+    return await this.redisService.hget(
+      RedisHashesKey.game(roomId),
+      RedisHashesField.roomInfo(),
+    );
   }
 
   async getRoomKeys(): Promise<string[]> {
-    return await this.redisService.keys(`${GAME_ROOM}*`);
+    return await this.redisService.keys(RedisHashesKey.allRoom());
   }
 
   // 방 나가기
@@ -202,13 +208,17 @@ export class GameRoomEventService {
     }
 
     const newMembers = members.filter((member) => member.userId !== memberId);
-    await this.saveMembers(this.makeRoomKey(roomId), MEMBER_FIELD, newMembers);
+    await this.saveMembers(
+      RedisHashesKey.game(roomId),
+      RedisHashesField.member(),
+      newMembers,
+    );
 
     return newMembers;
   }
   // 방 삭제
   async remove(roomId: number): Promise<object> {
-    await this.redisService.del(this.makeRoomKey(roomId));
+    await this.redisService.del(RedisHashesKey.game(roomId));
     try {
       await this.janusService.destroyJanusRoom(roomId);
     } catch (error) {
@@ -233,8 +243,8 @@ export class GameRoomEventService {
   // 게임 정보 저장
   async saveGameRoomInfo(gameRoom: GameRoom): Promise<any> {
     return await this.redisService.hset(
-      this.makeRoomKey(gameRoom.id),
-      INFO_FIELD,
+      RedisHashesKey.room(gameRoom.id),
+      RedisHashesField.roomInfo(),
       gameRoom,
     );
   }
@@ -246,7 +256,11 @@ export class GameRoomEventService {
         member.ready = !member.ready;
       }
     }
-    await this.saveMembers(this.makeRoomKey(roomId), MEMBER_FIELD, members);
+    await this.saveMembers(
+      RedisHashesKey.game(roomId),
+      RedisHashesField.member(),
+      members,
+    );
     return members;
   }
 
@@ -263,10 +277,14 @@ export class GameRoomEventService {
     // player gameId 저장
     players.forEach((player) => (player.gameId = gameId));
 
-    await this.redisService.hset(this.makeGameKey(roomId), INFO_FIELD, room);
     await this.redisService.hset(
-      this.makeGameKey(roomId),
-      PLAYER_FIELD,
+      RedisHashesKey.game(roomId),
+      RedisHashesField.roomInfo(),
+      room,
+    );
+    await this.redisService.hset(
+      RedisHashesKey.game(roomId),
+      RedisHashesField.player(),
       players,
     );
   }
@@ -314,12 +332,6 @@ export class GameRoomEventService {
     return memberId === userId;
   }
 
-  makeRoomKey(roomId: number): string {
-    return `${GAME_ROOM}:${roomId}`;
-  }
-  makeGameKey(roomId: number): string {
-    return `${GAME}:${roomId}`;
-  }
   async getJanusRoomListParticipants(room: number): Promise<any> {
     return await this.janusService.getJanusRoomListParticipants(room);
   }

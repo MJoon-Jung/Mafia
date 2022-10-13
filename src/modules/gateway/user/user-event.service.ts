@@ -1,22 +1,22 @@
 import { Injectable } from '@nestjs/common';
+import { RedisBitKey } from 'src/modules/dm/constants/RedisBitKey';
 import { RedisService } from 'src/modules/redis/redis.service';
 import { FriendProfile } from 'src/modules/user/dto';
-import { ONLINE } from '../game-room/constants';
 
 @Injectable()
 export class UserEventService {
   constructor(private readonly redisService: RedisService) {}
 
   async setOnline(userId: number) {
-    await this.redisService.setbit(ONLINE, userId, 1);
+    await this.redisService.setbit(RedisBitKey.ONLINE, userId, 1);
   }
 
   async setOffline(userId: number) {
-    await this.redisService.setbit(ONLINE, userId, 0);
+    await this.redisService.setbit(RedisBitKey.ONLINE, userId, 0);
   }
 
   async getOnline(userId: number) {
-    return await this.redisService.getbit(ONLINE, userId);
+    return await this.redisService.getbit(RedisBitKey.ONLINE, userId);
   }
 
   async getNsps(friends: FriendProfile[]) {

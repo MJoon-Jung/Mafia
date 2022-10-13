@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/ban-types */
 import { Inject, Logger, UseGuards } from '@nestjs/common';
 import {
   ConnectedSocket,
@@ -8,28 +9,32 @@ import {
   SubscribeMessage,
   WebSocketGateway,
   WebSocketServer,
+  WsException,
 } from '@nestjs/websockets';
 import { Server } from 'socket.io';
 import { WsAuthenticatedGuard } from '../guards/ws.authenticated.guard';
 import { GameEvent } from './constants/game-event';
-import {
-  FINISH_VOTE_FIELD,
-  MAFIA_FIELD,
-} from './constants/game-redis-key-prefix';
 import { AuthenticatedSocket } from '../game-room/constants/authenticated-socket';
 import { GameEventService } from './game-event.service';
-import { GamePlayerGuard } from '../guards/game-player.guard';
 import customParseFormat from 'dayjs/plugin/customParseFormat';
 import 'dayjs/locale/ko';
 import dayjs from 'dayjs';
+import { ConfigService } from '@nestjs/config';
+import { RedisService } from 'src/modules/redis/redis.service';
+import { GameRepository } from 'src/modules/game/game.repository';
+import { GameTurn } from 'src/modules/gateway/game/constants/game-turn';
+import { EnumGameRole, EnumGameTeam } from 'src/common/constants';
+import { Player } from 'src/modules/game-room/dto/player';
+import { RedisHashesKey } from 'src/modules/gateway/common/RedisHashesKey';
+import { RedisHashesField } from 'src/modules/gateway/common/RedisHashesField';
+import { PunishBallotBox } from 'src/modules/gateway/game/PunishBallotBox';
+import { GameMessage } from 'src/modules/gateway/game/constants/GameMessage';
+
 dayjs.locale('ko');
 dayjs.extend(customParseFormat);
-import { EnumGameRole } from '../../../common/constants/enum-game-role';
-import { ConfigService } from '@nestjs/config';
 
 @UseGuards(WsAuthenticatedGuard)
 @WebSocketGateway({
-  // path: '/socket.io' <- defaut path,
   transports: ['websocket'],
   cors: { origin: '*', credentials: true },
   namespace: '/game',
@@ -41,470 +46,452 @@ export class GameGateway
     @Inject(Logger) private readonly logger: Logger,
     private readonly gameEventService: GameEventService,
     private readonly configService: ConfigService,
+    private readonly redisService: RedisService,
+    private readonly gameRepository: GameRepository,
   ) {}
   @WebSocketServer() public server: Server;
 
-  // 가드를 통해서 플레이어인지 확인
-  @UseGuards(GamePlayerGuard)
   @SubscribeMessage(GameEvent.JOIN)
   async handleGameJoin(
     @ConnectedSocket() socket: AuthenticatedSocket,
     @MessageBody() data: { roomId: number },
   ) {
-    const { user } = socket.request;
-    const newNamespace = socket.nsp;
     const { roomId } = data;
+    const players = await this.gameEventService.findPlayers(roomId);
+    const maybePlayer = players.find(
+      (player) => player.id === socket.request.user.profile.id,
+    );
+    if (!maybePlayer) {
+      throw new WsException('게임 플레이어가 아닙니다');
+    }
+    await socket.join(`${socket.nsp.name}-${roomId}`);
     socket.data['roomId'] = roomId;
 
-    this.logger.log(`join ${roomId}`);
-
-    try {
-      await socket.join(`${newNamespace.name}-${roomId}`);
-      this.server.in(socket.id).emit(GameEvent.JOIN, user);
-    } catch (error) {
-      this.logger.error('socket join event error', error);
-    }
-  }
-
-  @SubscribeMessage(GameEvent.TIMER)
-  async handleTimer(@ConnectedSocket() socket: AuthenticatedSocket) {
-    const { roomId } = socket.data;
-    const { user } = socket.request;
-    const newNamespace = socket.nsp;
-
-    const { playerSum, count } =
-      await this.gameEventService.setPlayerExceptLeaveDie(roomId, user);
-
-    this.logger.log(
-      `GATEWAY[TIMER] setPlayerExceptLeaveDie, 총 인원 ${playerSum},  count ${count}`,
+    const count = await this.redisService.hincrby(
+      RedisHashesKey.game(roomId),
+      RedisHashesField.joinCount(),
     );
+    if (count < players.length) return;
 
-    if (playerSum !== count) {
-      return;
-    }
-    await this.gameEventService.delPlayerNum(roomId);
-
-    try {
-      setTimeout(() => {
-        const end = dayjs().add(
-          parseInt(this.configService.get('TIMER'), 10) || 20,
-          's',
-        );
-        const timeInterval = setInterval(() => {
-          const currentTime = dayjs();
-          const time = end.diff(currentTime, 's');
-
-          if (!time) {
-            clearInterval(timeInterval);
-          }
-          this.server
-            .in(`${newNamespace.name}-${roomId}`)
-            .emit(GameEvent.TIMER, { time });
-        }, 1000);
-      }, 3000);
-    } catch (error) {
-      this.logger.error('event error', error);
-    }
-  }
-
-  @SubscribeMessage(GameEvent.WINNER)
-  async handleWinner(@ConnectedSocket() socket: AuthenticatedSocket) {
-    const { roomId } = socket.data;
-    const newNamespace = socket.nsp;
-
-    // 우승 값 판단 / 만약에 우승이 아니면 null 반환
-    const winner = await this.gameEventService.winner(roomId);
-
-    if (winner) {
-      this.logger.log(`WINNER ${winner}`);
-
-      this.server
-        .in(`${newNamespace.name}-${roomId}`)
-        .emit(GameEvent.WINNER, { winner: winner });
-      this.handleGameEnd(socket, { winner: winner });
-    }
-
-    return winner;
-  }
-
-  @SubscribeMessage(GameEvent.DAY)
-  async HandleDay(
-    @ConnectedSocket() socket: AuthenticatedSocket,
-    @MessageBody() data: { day: boolean },
-  ) {
-    const { roomId } = socket.data;
-    const { user } = socket.request;
-    const newNamespace = socket.nsp;
-
-    const { playerSum, count } =
-      await this.gameEventService.setPlayerExceptLeaveDie(roomId, user);
-
-    this.logger.log(
-      `GATEWAY[DAY] setPlayerExceptLeaveDie, 총 인원 ${playerSum},  count ${count}`,
-    );
-
-    if (playerSum === count) {
-      this.logger.log(`현재 DAY  ${data.day}`);
-      await this.gameEventService.delPlayerNum(roomId);
-
-      // default - 밤 = false
-      // 우승값 or null
-      // socket - roomId,newNAmespace 정도 얻기용.
-      const winner = await this.handleWinner(socket);
-
-      if (!winner) {
-        const thisDay = !data.day;
-        this.logger.log(`변경 후 DAY  ${thisDay}`);
-        await this.gameEventService.setDay(roomId, thisDay);
-
-        // 비동기 신호
-        setTimeout(() => {
-          this.server
-            .in(`${newNamespace.name}-${roomId}`)
-            .emit(GameEvent.DAY, { day: thisDay });
-        }, 5000);
-      }
-    }
-  }
-
-  //이겼을 시, 게임 정보 db에 저장하는 부분 로직도 짜야함.
-
-  @SubscribeMessage(GameEvent.START)
-  async handleStart(@ConnectedSocket() socket: AuthenticatedSocket) {
-    const { roomId } = socket.data;
-    const { user } = socket.request;
-    const newNamespace = socket.nsp;
-
-    const Players = await this.gameEventService.findPlayers(roomId);
-    // if (gamePlayers.length < 6)
-    //   //  throw new ForbiddenException()
-    //   throw new ForbiddenException('인원이 부족합니다.');
-
-    let count;
-    //count
-    for (const player of Players) {
-      if (player.id === user.profile.id) {
-        count = await this.gameEventService.setPlayerNum(roomId);
-      }
-    }
-
-    this.logger.log(count);
-
-    if (Players.length === count) {
-      this.logger.log(
-        `START EVENT 발생  총 인원: ${Players.length} 카운팅 : ${count}`,
-      );
-      await this.gameEventService.delPlayerNum(roomId);
-      this.logger.log(`START EVENT발생`);
-      this.logger.log(Players);
-      // 비동기 신호
-      setTimeout(() => {
-        this.server
-          .to(`${newNamespace.name}-${roomId}`)
-          .emit(GameEvent.START, Players);
-      }, 5000);
-
-      const jobData = this.gameEventService.getJobData(Players.length);
-      await this.gameEventService.PlayerJobs(roomId, jobData, Players.length);
-    }
-  }
-
-  // 각자의 직업만 제공
-  @SubscribeMessage(GameEvent.JOB)
-  async handleGrantJob(@ConnectedSocket() socket: AuthenticatedSocket) {
-    const { user } = socket.request;
-    const { roomId } = socket.data;
-
-    // 현재 방의 인원
-    const players = await this.gameEventService.findPlayers(roomId);
-
-    // 특정 플레이어의 순서 === jobs[순서]
-    const gamePlayer = await this.gameEventService.getPlayerJobs(roomId);
-
+    await this.gameEventService.setDay(roomId);
+    await this.gameEventService.setStatus(roomId, GameTurn.MEETING);
+    const jobs = this.gameEventService.setInitialPlayerJob(count);
     players.forEach((player, idx) => {
-      if (player.userId === user.id) {
-        player.job = gamePlayer[idx].job;
+      player.job = jobs[idx];
+      player.die = false;
+      player.team =
+        player.job === EnumGameRole.MAFIA
+          ? EnumGameTeam.MAFIA
+          : EnumGameTeam.CITIZEN;
+    });
+    await this.gameEventService.setPlayers(roomId, players);
+    await this.gameRepository.setRole(players);
+    // 굳이 보낼 필요 있나?
+    this.server.to(`${socket.nsp.name}-${roomId}`).emit(GameEvent.JOIN);
+  }
+  @SubscribeMessage(GameEvent.START)
+  async handleGameStart(@ConnectedSocket() socket: AuthenticatedSocket) {
+    /**
+     * status 회의 설정
+     * player 직업 설정
+     * timer 실행
+     */
+    const { roomId } = socket.data;
+    const players: Player[] = await this.gameEventService.findPlayers(roomId);
+    const maybePlayer = players.find(
+      (player) => player.id === socket.request.user.profile.id,
+    );
+    if (!maybePlayer) {
+      throw new WsException('게임 플레이어가 아닙니다');
+    }
+    const count = await this.redisService.hincrby(
+      RedisHashesKey.game(roomId),
+      RedisHashesField.joinCount(),
+    );
+
+    players.forEach((player) => {
+      /**
+       * mafia인 경우에 mafia 빼고 다 직업 정보 null
+       * 다른 직업은 자신 제외 직업 정보 null
+       */
+      if (maybePlayer.job === EnumGameRole.MAFIA) {
+        if (player.job !== EnumGameRole.MAFIA) player.job = null;
+      } else {
+        if (player.id !== maybePlayer.id) player.job = null;
       }
+      return player;
     });
 
-    this.logger.log(`JOB 직업 제공.`);
-    this.server.in(socket.id).emit(GameEvent.JOB, players);
+    socket
+      .to(`${socket.nsp.name}-${roomId}`)
+      .emit(GameEvent.START, { players });
+
+    if (count < players.length) return;
+
+    // Todo timer 실행
+    this.startTimer(roomId, `${socket.nsp.name}-${roomId}`);
   }
-
-  @SubscribeMessage(GameEvent.USEJOBS)
-  async HandleUseJobs(@ConnectedSocket() socket: AuthenticatedSocket) {
-    const { roomId } = socket.data;
-    const { user } = socket.request;
-    const newNamespace = socket.nsp;
-
-    this.logger.log(`USEJOBS 1. 발생`);
-
-    const { playerSum, count } = await this.gameEventService.setPlayerCheckNum(
-      roomId,
-      user,
-    );
-
-    this.logger.log(`USEJOBS 2. 총 인원 : ${playerSum}, 카운트${count}`);
-
-    if (playerSum === count) {
-      await this.gameEventService.delPlayerNum(roomId);
-
-      const status = await this.gameEventService.useState(roomId);
-
-      this.logger.log(`USEJOBS 3. 의사, 마피아 능력사용`);
-      this.logger.log(status);
-
-      this.server
-        .in(`${newNamespace.name}-${roomId}`)
-        .emit(GameEvent.USEJOBS, status);
-
-      await this.gameEventService.delValue(roomId, MAFIA_FIELD);
-    }
-  }
-
-  //투표
-  @SubscribeMessage(GameEvent.VOTE)
-  async handleVote(
-    @MessageBody() data: { vote: number },
-    @ConnectedSocket() socket: AuthenticatedSocket,
-  ) {
-    const { roomId } = socket.data;
-    const { user } = socket.request;
-    const newNamespace = socket.nsp;
-
-    const { playerSum, count } = await this.gameEventService.CheckNum(
-      roomId,
-      user,
-    );
-
-    // Todo 탈주/죽음/실존 플레이어 유효성 체크
-    // Todo 죽은 사람을 투표 / 죽은 사람이 투표 유효성 체크 ok
-    await this.gameEventService.voteValidation(roomId, data.vote);
-
-    if (count <= playerSum) {
-      this.logger.log(`VOTE 투표값: ${data.vote}`);
-      await this.gameEventService.setVote(roomId, data.vote);
-    }
-
-    const redisVote = {};
-    const result = await this.gameEventService.getVote(roomId);
-
-    if (!result || !result?.length) return;
-
-    result.forEach((val) => {
-      if (val) redisVote[val] = (redisVote[val] || 0) + 1;
-    });
-
-    console.log(redisVote);
-
-    this.server
-      .to(`${newNamespace.name}-${roomId}`)
-      .emit(GameEvent.CURRENT_VOTE, redisVote);
-  }
-
-  // 투표 합.
-  @SubscribeMessage(GameEvent.FINISHV)
-  async handleFinishVote(@ConnectedSocket() socket: AuthenticatedSocket) {
-    const { roomId } = socket.data;
-    const { user } = socket.request;
-    const newNamespace = socket.nsp;
-
-    // Todo 1일차 낮 투표, 1일차 낮 찬성. 나주엥 리펙토링
-    const { playerSum, count } = await this.gameEventService.setPlayerCheckNum(
-      roomId,
-      user,
-    );
-
-    if (playerSum === count) {
-      this.logger.log(`FINISHV , 총 인원 ${playerSum}, count ${count}`);
-      await this.gameEventService.delPlayerNum(roomId);
-      await this.gameEventService.delNum(roomId);
-
-      const result = await this.gameEventService.sortfinishVote(roomId);
-
-      //동률일 경우.
-      if (!result.result) {
-        await this.gameEventService.delValue(roomId, FINISH_VOTE_FIELD);
-      }
-
-      this.logger.log(`FINISHV 값 형태`);
-      // this.logger.log(result); //null일 경우 logger 안 됨
-
-      this.server
-        .to(`${newNamespace.name}-${roomId}`)
-        .emit(GameEvent.FINISHV, result);
-    }
-  }
-
-  // 무효표는 false로 받음.
-  @SubscribeMessage(GameEvent.PUNISH)
-  async handlePunish(
-    @MessageBody() data: { punish: boolean },
-    @ConnectedSocket() socket: AuthenticatedSocket,
-  ) {
-    const { roomId } = socket.data;
-    const { user } = socket.request;
-
-    const { playerSum, count } = await this.gameEventService.CheckNum(
-      roomId,
-      user,
-    );
-
-    // Todo 탈주/죽음/실존 플레이어 유효성 체크 [이벤트에서]
-    // 여기서 true값만 넣도록 처리되어 있음.
-    if (count > playerSum) return null;
-
-    // this.logger.log(`PUNISH , 선택 값 : ${data.punish}`);
-    if (data.punish) {
-      await this.gameEventService.setPunish(roomId, data.punish);
-    }
-  }
-
-  // 찬반투표
-  @SubscribeMessage(GameEvent.FINISHP)
-  async handlePunishP(@ConnectedSocket() socket: AuthenticatedSocket) {
-    const { roomId } = socket.data;
-    const { user } = socket.request;
-    const newNamespace = socket.nsp;
-
-    // 요청 인원 수 체크
-    const { playerSum, count } = await this.gameEventService.setPlayerCheckNum(
-      roomId,
-      user,
-    );
-
-    if (playerSum === count) {
-      await this.gameEventService.delPlayerNum(roomId);
-      await this.gameEventService.delNum(roomId);
-
-      const gamePlayer = await this.gameEventService.getPlayerJobs(roomId);
-      const deathNum = await this.gameEventService.getVoteDeath(roomId); //죽이려는 대상 번호
-      this.logger.log(`FINISHP, 죽이려는 대상의 번호: ${deathNum}`);
-      // Todo 죽는 유저정보.
-      let death = gamePlayer[deathNum - 1]; //죽이려는 대상의 유저정보.
-
-      // Todo 유저의 찬성값 수
-      const agreement = await this.gameEventService.getPunishSum(roomId);
-
-      // Todo 과반수 이상일 때, 사형 유무
-      const result = playerSum / 2 < agreement ? true : false;
-
-      if (result) {
-        //죽은 사람 정보
-        death = await this.gameEventService.death(roomId, deathNum);
-      }
-
-      this.logger.log(
-        `FINISHP, 사형 결과 ${result}, 죽은 사람 : ${death}, 찬성 값: ${agreement}`,
+  async startTimer(roomId: number, socketRoom: string) {
+    /**
+     * status 확인
+     * status에 따라 실행
+     * timer 종료 후
+     * status 변경
+     * startTimer 호출
+     *
+     */
+    const turn: GameTurn = await this.gameEventService.getGameTurn(roomId);
+    const day: number = await this.gameEventService.getDay(roomId);
+    let time = 60;
+    if (turn === GameTurn.MEETING) {
+      /**
+       * 할 거 없음
+       */
+      setTimeout(
+        async function run(
+          gameEventService: GameEventService,
+          server: Server,
+          startTimer: Function,
+        ) {
+          if (time-- >= 0) {
+            server
+              .to(socketRoom)
+              .emit(GameEvent.TIMER, { time, status: turn, day });
+            setTimeout(run, 1000, gameEventService, server, startTimer);
+            return;
+          }
+          /**
+           * turn 변경 및 startTimer 실행
+           */
+          await gameEventService.setStatus(roomId, GameTurn.VOTE);
+          await startTimer();
+        },
+        1000,
+        this.gameEventService,
+        this.server,
+        this.startTimer,
       );
+    } else if (turn === GameTurn.VOTE) {
+      /**
+       * 할 거 없음
+       */
+      setTimeout(
+        async function run(
+          gameEventService: GameEventService,
+          server: Server,
+          startTimer: Function,
+        ) {
+          if (time-- >= 0) {
+            server
+              .to(socketRoom)
+              .emit(GameEvent.TIMER, { time, status: turn, day });
+            setTimeout(run, 1000, gameEventService, server, startTimer);
+            return;
+          }
+          /**
+           * vote 결과 종합 후 다음 턴 계산해서 바꿔줌
+           */
+          const ballotBox = await gameEventService.getBallotBox(roomId, day);
 
-      // 찬성 값만 주기
-      this.server.to(`${newNamespace.name}-${roomId}`).emit(GameEvent.FINISHP, {
-        result: result,
-        user: death,
-        punish: agreement,
-      });
+          const players = await gameEventService.findPlayers(roomId);
+          if (
+            ballotBox.majorityVote(
+              gameEventService.getLivingPlayerCount(players),
+            )
+          ) {
+            const votedPlayer: Player =
+              players[ballotBox.electedPlayerVideoNum() - 1];
+            if (votedPlayer.die)
+              throw new WsException('이미 죽은 플레이어입니다.');
 
-      await this.gameEventService.delValue(roomId, FINISH_VOTE_FIELD);
+            await gameEventService.setPunishedPlayer(roomId, day, votedPlayer);
+            await gameEventService.setStatus(roomId, GameTurn.PUNISHMENT);
+
+            server.to(socketRoom).emit(GameEvent.VOTE, {
+              playerVideoNum: ballotBox.electedPlayerVideoNum(),
+              message: GameMessage.VOTE_RESULT_MAJORITY(votedPlayer.nickname),
+            });
+          } else {
+            await gameEventService.setStatus(roomId, GameTurn.NIGHT);
+            server.to(socketRoom).emit(GameEvent.VOTE, {
+              playerVideoNum: null,
+              message: GameMessage.VOTE_RESULT_NOT_MAJORITY(),
+            });
+          }
+          // Todo message 처형되는 사람 누구인지 등등 정보 생각할 것
+          await startTimer();
+        },
+        1000,
+        this.gameEventService,
+        this.server,
+        this.startTimer,
+      );
+    } else if (turn === GameTurn.PUNISHMENT) {
+      /**
+       * 할 거 없음
+       */
+      setTimeout(
+        async function run(
+          gameEventService: GameEventService,
+          server: Server,
+          startTimer: Function,
+        ) {
+          if (time-- >= 0) {
+            server
+              .to(socketRoom)
+              .emit(GameEvent.TIMER, { time, status: turn, day });
+            setTimeout(run, 1000, gameEventService, server, startTimer);
+            return;
+          }
+          /**
+           * punish 결과 종합 후
+           * 처형됐는지 안됐는지 처리할 것
+           * 처형됐다면 승리 조건 검사
+           * turn night로 변경
+           */
+          const result = await gameEventService.getPunishVote(roomId, day);
+          const punishBallotBox = PunishBallotBox.of(result);
+          const players = await gameEventService.findPlayers(roomId);
+          let data: {
+            result: boolean;
+            playerVideoNum: number;
+            message: string;
+          };
+          if (
+            punishBallotBox.majorityVote(
+              gameEventService.getLivingPlayerCount(players),
+            )
+          ) {
+            const punishedPlayer: Player =
+              await gameEventService.getPunishedPlayer(roomId, day);
+
+            // 죽음 처리 저장
+            let playerVideoNum: number;
+            players.forEach((player, idx) => {
+              if (player.id === punishedPlayer.id) {
+                player.die = true;
+                playerVideoNum = idx + 1;
+              }
+            });
+            gameEventService.setPlayers(roomId, players);
+            // socket 데이터 전송
+            if (punishedPlayer.job === EnumGameRole.MAFIA) {
+              data = {
+                result: true,
+                playerVideoNum,
+                message: GameMessage.PUNISH_RESULT_MAFIA(),
+              };
+            } else {
+              data = {
+                result: true,
+                playerVideoNum,
+                message: GameMessage.PUNISH_RESULT_CITIZEN(),
+              };
+            }
+            server.to(socketRoom).emit(GameEvent.PUNISH, data);
+            // 승리 조건 검사 후 게임 END
+            const result =
+              await gameEventService.haveNecessaryConditionOfWinning(players);
+            if (result.win) {
+              setTimeout(() => {
+                server.to(socketRoom).emit(GameEvent.END, result);
+              }, 2000);
+              return;
+            }
+          } else {
+            data = {
+              result: false,
+              playerVideoNum: null,
+              message: GameMessage.PUNISH_NOT_MAJORITY(),
+            };
+          }
+          await gameEventService.setStatus(roomId, GameTurn.NIGHT);
+          await startTimer();
+        },
+        1000,
+        this.gameEventService,
+        this.server,
+        this.startTimer,
+      );
+    } else if (turn === GameTurn.NIGHT) {
+      setTimeout(
+        async function run(
+          gameEventService: GameEventService,
+          server: Server,
+          startTimer: Function,
+        ) {
+          if (time-- >= 0) {
+            server
+              .to(socketRoom)
+              .emit(GameEvent.TIMER, { time, status: turn, day });
+            setTimeout(run, 1000, gameEventService, server, startTimer);
+            return;
+          }
+          /**
+           * 밤 능력 종합 후 게임 승리 조건 검사한 후 타이머 실행한다.
+           */
+          const result = await gameEventService.getSkillResult(roomId, day);
+          server.to(socketRoom).emit(GameEvent.SKILL, result);
+
+          if (result.die) {
+            const players = await gameEventService.findPlayers(roomId);
+            // 죽음 처리
+            players.forEach((player) => {
+              if (player.id === result.playerVideoNum) {
+                player.die = true;
+              }
+            });
+            gameEventService.setPlayers(roomId, players);
+            // 승리 조건 검사
+            const data = await gameEventService.haveNecessaryConditionOfWinning(
+              players,
+            );
+            if (data.win) {
+              setTimeout(() => {
+                server.to(socketRoom).emit(GameEvent.END, data);
+              }, 2000);
+              //Todo database에 저장
+              return;
+            }
+          }
+          await gameEventService.setStatus(roomId, GameTurn.MEETING);
+          await startTimer();
+        },
+        1000,
+        this.gameEventService,
+        this.server,
+        this.startTimer,
+      );
     }
   }
-
-  // 능력사용 부분
-  // 경찰 능력
-  @SubscribeMessage(GameEvent.POLICE)
-  async handleUsePolice(
-    @MessageBody() data: { userNum: number },
+  @SubscribeMessage(GameEvent.VOTE)
+  async handleGameVote(
     @ConnectedSocket() socket: AuthenticatedSocket,
+    @MessageBody() data: { roomId: number; playerVideoNum: number },
   ) {
     const { roomId } = socket.data;
-    const { user } = socket.request;
-
-    this.logger.log(`POLICE, 선택 유저 번호 ${data.userNum}`);
-    if (!data.userNum) return;
-
-    const usePolice = await this.gameEventService.usePolice(
-      roomId,
-      data.userNum,
-      user,
+    const players = await this.gameEventService.findPlayers(roomId);
+    const maybePlayer = players.find(
+      (player) => player.id === socket.request.user.profile.id,
     );
-
-    this.logger.log(
-      `POLICE 능력으로 알아낸 ${usePolice.user.nickname}유저의 ${usePolice.user.job} 값`,
-    );
-    this.logger.log(`${usePolice}`);
-
-    this.server.to(socket.id).emit(GameEvent.POLICE, usePolice);
+    if (!maybePlayer) {
+      throw new WsException('게임 플레이어가 아닙니다');
+    }
+    const day = await this.gameEventService.getDay(roomId);
+    await this.gameEventService.setVote(roomId, day, data.playerVideoNum);
   }
-
-  @SubscribeMessage(GameEvent.MAFIASEARCH)
-  async handleMafiaSerach(@ConnectedSocket() socket: AuthenticatedSocket) {
+  @SubscribeMessage(GameEvent.PUNISH)
+  async handleGamePunish(
+    @ConnectedSocket() socket: AuthenticatedSocket,
+    @MessageBody() data: { roomId: number; agree: boolean },
+  ) {
     const { roomId } = socket.data;
-    this.logger.log(`MAFIASEARCH 실행`);
-
-    const mafias = await this.gameEventService.getMafiaSearch(roomId);
-
-    this.logger.log(`MAFIASEARCH 값 형태`);
-    this.logger.log(`${mafias}`);
-
-    this.server.to(socket.id).emit(GameEvent.MAFIASEARCH, { mafia: mafias });
+    const players = await this.gameEventService.findPlayers(roomId);
+    const maybePlayer = players.find(
+      (player) => player.id === socket.request.user.profile.id,
+    );
+    if (!maybePlayer) {
+      throw new WsException('게임 플레이어가 아닙니다');
+    }
+    const day = await this.gameEventService.getDay(roomId);
+    if (data.agree) {
+      await this.gameEventService.setPunishVote(roomId, day);
+    }
   }
-
-  // 능력사용 부분
-  // 마피아 능력
   @SubscribeMessage(GameEvent.MAFIA)
-  async handleUseMafia(
-    @MessageBody() data: { userNum: number },
+  async handleGameMafiaSkill(
     @ConnectedSocket() socket: AuthenticatedSocket,
+    @MessageBody() data: { roomId: number; playerVideoNum: number },
   ) {
     const { roomId } = socket.data;
-    const { user } = socket.request;
-
-    this.logger.log(`MAFIA 투표 값 ${data.userNum}`);
-
-    // Todo 여러명의 마피아의 동일한 값일 경우만, 체크 -> ok 일단 다 받은 후, usejobs에서 능력사용할 때, 확인.
-    const voteUserNum = await this.gameEventService.useMafia(
-      roomId,
-      data.userNum,
-      user,
+    const players = await this.gameEventService.findPlayers(roomId);
+    const maybePlayer = players.find(
+      (player) => player.id === socket.request.user.profile.id,
     );
-
-    this.server.to(socket.id).emit(GameEvent.MAFIA, voteUserNum);
-  }
-
-  // 능력사용 부분
-  // 의사
-  @SubscribeMessage(GameEvent.DOCTOR)
-  async handleUseDoctor(
-    @MessageBody() data: { userNum: number },
-    @ConnectedSocket() socket: AuthenticatedSocket,
-  ) {
-    const { roomId } = socket.data;
-    const { user } = socket.request;
-
-    this.logger.log(`DOCTOR 투표 값 ${data.userNum}`);
-
-    const voteUserNum = await this.gameEventService.useDoctor(
-      roomId,
-      data.userNum,
-      user,
-    );
-
-    this.server.to(socket.id).emit(GameEvent.DOCTOR, voteUserNum);
-  }
-
-  @SubscribeMessage('myFaceLandmarks')
-  handleLandmarks(@MessageBody() data: { landmarks: string; id: string }) {
-    if (!data.landmarks) {
-      this.server.emit('othersFaceLandmarks', {
-        landmarks: null,
-        id: data.id,
-      });
-    } else {
-      this.server.emit('othersFaceLandmarks', {
-        landmarks: data.landmarks,
-        id: data.id,
-      });
+    if (!maybePlayer) {
+      throw new WsException('게임 플레이어가 아닙니다');
     }
+    if (maybePlayer.job !== EnumGameRole.MAFIA) {
+      throw new WsException('마피아의 능력을 사용할 권한이 없습니다.');
+    }
+    if (!data.playerVideoNum) return;
+    const day = await this.gameEventService.getDay(roomId);
+    await this.gameEventService.setMafiaKill(roomId, day, data.playerVideoNum);
+  }
+  @SubscribeMessage(GameEvent.DOCTOR)
+  async handleGameDoctorSkill(
+    @ConnectedSocket() socket: AuthenticatedSocket,
+    @MessageBody() data: { roomId: number; playerVideoNum: number },
+  ) {
+    const { roomId } = socket.data;
+    const players = await this.gameEventService.findPlayers(roomId);
+    const maybePlayer = players.find(
+      (player) => player.id === socket.request.user.profile.id,
+    );
+    if (!maybePlayer) {
+      throw new WsException('게임 플레이어가 아닙니다');
+    }
+    if (maybePlayer.job !== EnumGameRole.DOCTOR) {
+      throw new WsException('의사의 능력을 사용할 권한이 없습니다.');
+    }
+    if (!data.playerVideoNum) return;
+    const day = await this.gameEventService.getDay(roomId);
+    await this.gameEventService.setDoctorSkill(
+      roomId,
+      day,
+      data.playerVideoNum,
+    );
+  }
+  @SubscribeMessage(GameEvent.POLICE)
+  async handleGamePoliceSkill(
+    @ConnectedSocket() socket: AuthenticatedSocket,
+    @MessageBody() data: { roomId: number; playerVideoNum: number },
+  ) {
+    const { roomId } = socket.data;
+    const players = await this.gameEventService.findPlayers(roomId);
+    const maybePlayer = players.find(
+      (player) => player.id === socket.request.user.profile.id,
+    );
+    if (!maybePlayer) {
+      throw new WsException('게임 플레이어가 아닙니다');
+    }
+    if (maybePlayer.job !== EnumGameRole.POLICE) {
+      throw new WsException('경찰의 능력을 사용할 권한이 없습니다.');
+    }
+
+    if (!data.playerVideoNum) return;
+
+    this.server.to(socket.id).emit(GameEvent.POLICE, {
+      message: GameMessage.NIGHT_POLICE_SKILL(
+        players[data.playerVideoNum].nickname,
+        players[data.playerVideoNum].job,
+      ),
+    });
+  }
+  //Todo 탈주 및 죽은 사람을 제외하고 과반수 이상의 투표를 얻어야함
+  //Todo 탈주 처리 - rdb, mdb 저장
+  @SubscribeMessage(GameEvent.LEAVE)
+  async handleLeave(@ConnectedSocket() socket: AuthenticatedSocket) {
+    const { roomId } = socket.data;
+    socket.data = null;
+    await this.leave(
+      roomId,
+      `${socket.nsp.name}-${roomId}`,
+      socket.request.user.profile.id,
+    );
+  }
+
+  @SubscribeMessage(GameEvent.LANDMARK)
+  handleLandmarks(
+    @ConnectedSocket() socket: AuthenticatedSocket,
+    @MessageBody() data: { landmarks: string | null },
+  ) {
+    // socket room안에 자신을 제외한 플레이어들에게 landmark 정보 전달
+    const { roomId } = socket.data;
+    this.server.in(`${socket.nsp.name}-${roomId}`).emit(GameEvent.LANDMARK, {
+      id: socket.request.user.profile.id,
+      landmarks: data?.landmarks || null,
+    });
   }
   @SubscribeMessage(GameEvent.SPEAK)
   async handleSpeak(
@@ -513,69 +500,33 @@ export class GameGateway
     data: { userId: number; nickname: string; speaking: boolean },
   ) {
     const { roomId } = socket.data;
-    const newNamespace = socket.nsp;
-
-    this.server
-      .to(`${newNamespace.name}-${roomId}`)
-      .emit(GameEvent.SPEAK, data);
+    this.server.to(`${socket.nsp.name}-${roomId}`).emit(GameEvent.SPEAK, data);
   }
 
-  @SubscribeMessage(GameEvent.LEAVE)
-  async handleLeave(@ConnectedSocket() socket: AuthenticatedSocket) {
+  async handleConnection(@ConnectedSocket() socket: AuthenticatedSocket) {}
+  async handleDisconnect(@ConnectedSocket() socket: AuthenticatedSocket) {
     const { roomId } = socket.data;
-    const newNamespace = socket.nsp;
-    const { user } = socket.request;
-
-    this.logger.log(`LEAVE userID ${user.id}`);
-
-    // 서비스 제공.
-    const leaveUser = await this.gameEventService.leaveUser(roomId, user);
-
-    this.server
-      .to(`${newNamespace.name}-${roomId}`)
-      .emit(GameEvent.LEAVE, leaveUser);
-
-    this.handleWinner(socket);
-  }
-
-  //Todo 게임 끝
-  @SubscribeMessage(GameEvent.GAMEEND)
-  async handleGameEnd(
-    @ConnectedSocket() socket: AuthenticatedSocket,
-    @MessageBody() data: { winner: EnumGameRole },
-  ) {
-    const { roomId } = socket.data;
-    const newNamespace = socket.nsp;
-    const { user } = socket.request;
-
-    this.logger.log(`GAMEEND userID ${user.id}`);
-
-    // 서비스 제공.
-    await this.gameEventService.SaveTheEntireGame(roomId, data.winner);
-
-    this.server.to(`${newNamespace.name}-${roomId}`).emit(GameEvent.GAMEEND);
-    // }
-  }
-
-  // socket이 연결됐을 때
-  async handleConnection(@ConnectedSocket() socket: AuthenticatedSocket) {
-    // 생성될 때 소켓 인스턴스의 namespace,  id
-    this.logger.log(
-      `socket connected ${socket.nsp.name} ${socket.id} ${socket.data.roomId}`,
+    if (!roomId) return;
+    socket.data = null;
+    await this.leave(
+      roomId,
+      `${socket.nsp.name}-${roomId}`,
+      socket.request.user.profile.id,
     );
   }
-
-  // socket이 연결 끊겼을 때
-  async handleDisconnect(@ConnectedSocket() socket: AuthenticatedSocket) {
-    const newNamespace = socket.nsp;
-    const { roomId } = socket.data;
-
-    this.logger.log(`socket disconnected: ${roomId} ${newNamespace}`);
-
-    // socket.leave(`${newNamespace.name}-${roomId}`);
-  }
-
-  afterInit(server: any) {
-    this.logger.log('after init');
+  afterInit(server: any) {}
+  async leave(roomId: number, socketRoom: string, playerId: number) {
+    await this.gameEventService.leave(roomId, playerId);
+    this.server.to(socketRoom).emit(GameEvent.LEAVE, { playerId });
+    const players = await this.gameEventService.findPlayers(roomId);
+    const result = await this.gameEventService.haveNecessaryConditionOfWinning(
+      players,
+    );
+    if (result.win) {
+      setTimeout(() => {
+        this.server.to(`${socketRoom}-${roomId}`).emit(GameEvent.END, result);
+      }, 1000);
+      return;
+    }
   }
 }

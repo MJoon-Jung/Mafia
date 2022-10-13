@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { ONLINE } from '../gateway/game-room/constants';
+import { RedisBitKey } from 'src/modules/dm/constants/RedisBitKey';
 import { DM_EVENT } from '../gateway/game-room/constants/user-event';
 import { UserGateway } from '../gateway/user/user.gateway';
 import { NotificationService } from '../notification/notification.service';
@@ -77,7 +77,10 @@ export class DMService {
 
     const nsps = [`/user-${sender.userId}`];
 
-    const online = await this.redisService.getbit(ONLINE, receiverId);
+    const online = await this.redisService.getbit(
+      RedisBitKey.ONLINE,
+      receiverId,
+    );
     if (online) {
       nsps.push(`/user-${receiverId}`);
     }

@@ -5,7 +5,7 @@ import { GameMember } from 'src/entities';
 import { CreateGameDto } from '../gateway/create-game.dto';
 import { Player } from '../game-room/dto/player';
 import { VScore } from 'src/entities/score.view';
-import { GameStatus } from 'src/common/constants';
+import { EnumGameTeam, GameStatus } from 'src/common/constants';
 
 @EntityRepository(Game)
 export class GameRepository extends AbstractRepository<Game> {
@@ -110,7 +110,7 @@ export class GameRepository extends AbstractRepository<Game> {
       .execute();
   }
 
-  async saveGameScore(players: Player[], winner: string) {
+  async saveGameScore(players: Player[], winner: EnumGameTeam) {
     const qb = getConnection().createQueryBuilder();
 
     return await Promise.all(

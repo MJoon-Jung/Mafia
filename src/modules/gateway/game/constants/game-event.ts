@@ -18,5 +18,7 @@ export const GameEvent = {
   USEJOBS: 'game:useJobs',
   SPEAK: 'game:speak',
   CURRENT_VOTE: 'game:currentVote',
-  GAMEEND: 'game:end',
+  END: 'game:end',
+  LANDMARK: 'game:landmark',
+  SKILL: 'game:skill',
 };

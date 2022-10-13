@@ -4,3 +4,8 @@ export enum EnumGameRole {
   DOCTOR = 'DOCTOR',
   POLICE = 'POLICE',
 }
+
+export enum EnumGameTeam {
+  CITIZEN = 'CITIZEN',
+  MAFIA = 'MAFIA',
+}
