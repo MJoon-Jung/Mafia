@@ -119,14 +119,17 @@ export class GameEventService {
       }
     });
     if (citizenTeamLose) {
-      this.gameRepository.saveGameScore(players, EnumGameTeam.CITIZEN);
+      await this.gameRepository.saveGameScore(players, EnumGameTeam.CITIZEN);
       return { win: EnumGameTeam.CITIZEN };
     }
     if (mafiaTeamLose) {
-      this.gameRepository.saveGameScore(players, EnumGameTeam.MAFIA);
+      await this.gameRepository.saveGameScore(players, EnumGameTeam.MAFIA);
       return { win: EnumGameTeam.MAFIA };
     }
     return { win: null };
+  }
+  async deleteGame(roomId: number) {
+    await this.redisService.del(RedisHashesKey.game(roomId));
   }
   async getDay(roomId: number): Promise<number> {
     return await this.redisService.hget(

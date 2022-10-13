@@ -19,7 +19,6 @@ import { GameEventService } from './game-event.service';
 import customParseFormat from 'dayjs/plugin/customParseFormat';
 import 'dayjs/locale/ko';
 import dayjs from 'dayjs';
-import { ConfigService } from '@nestjs/config';
 import { RedisService } from 'src/modules/redis/redis.service';
 import { GameRepository } from 'src/modules/game/game.repository';
 import { GameTurn } from 'src/modules/gateway/game/constants/game-turn';
@@ -45,7 +44,6 @@ export class GameGateway
   constructor(
     @Inject(Logger) private readonly logger: Logger,
     private readonly gameEventService: GameEventService,
-    private readonly configService: ConfigService,
     private readonly redisService: RedisService,
     private readonly gameRepository: GameRepository,
   ) {}
@@ -128,8 +126,7 @@ export class GameGateway
 
     if (count < players.length) return;
 
-    // Todo timer 실행
-    this.startTimer(roomId, `${socket.nsp.name}-${roomId}`);
+    await this.startTimer(roomId, `${socket.nsp.name}-${roomId}`);
   }
   async startTimer(roomId: number, socketRoom: string) {
     /**
@@ -218,7 +215,6 @@ export class GameGateway
               message: GameMessage.VOTE_RESULT_NOT_MAJORITY(),
             });
           }
-          // Todo message 처형되는 사람 누구인지 등등 정보 생각할 것
           await startTimer();
         },
         1000,
@@ -296,6 +292,7 @@ export class GameGateway
               setTimeout(() => {
                 server.to(socketRoom).emit(GameEvent.END, result);
               }, 2000);
+              await gameEventService.deleteGame(roomId);
               return;
             }
           } else {
@@ -350,7 +347,7 @@ export class GameGateway
               setTimeout(() => {
                 server.to(socketRoom).emit(GameEvent.END, data);
               }, 2000);
-              //Todo database에 저장
+              await gameEventService.deleteGame(roomId);
               return;
             }
           }
@@ -468,8 +465,6 @@ export class GameGateway
       ),
     });
   }
-  //Todo 탈주 및 죽은 사람을 제외하고 과반수 이상의 투표를 얻어야함
-  //Todo 탈주 처리 - rdb, mdb 저장
   @SubscribeMessage(GameEvent.LEAVE)
   async handleLeave(@ConnectedSocket() socket: AuthenticatedSocket) {
     const { roomId } = socket.data;
@@ -503,7 +498,11 @@ export class GameGateway
     this.server.to(`${socket.nsp.name}-${roomId}`).emit(GameEvent.SPEAK, data);
   }
 
-  async handleConnection(@ConnectedSocket() socket: AuthenticatedSocket) {}
+  async handleConnection(@ConnectedSocket() socket: AuthenticatedSocket) {
+    this.logger.log(
+      `socket connected ${socket.nsp.name} ${socket.id} ${socket.data.roomId}`,
+    );
+  }
   async handleDisconnect(@ConnectedSocket() socket: AuthenticatedSocket) {
     const { roomId } = socket.data;
     if (!roomId) return;
@@ -526,6 +525,7 @@ export class GameGateway
       setTimeout(() => {
         this.server.to(`${socketRoom}-${roomId}`).emit(GameEvent.END, result);
       }, 1000);
+      await this.gameEventService.deleteGame(roomId);
       return;
     }
   }
