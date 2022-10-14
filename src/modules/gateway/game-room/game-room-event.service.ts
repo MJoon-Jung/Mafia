@@ -114,7 +114,7 @@ export class GameRoomEventService {
     const members = await this.findMembersByRoomId(roomId);
     this.addMember(members, member);
     await this.saveMembers(
-      RedisHashesKey.game(roomId),
+      RedisHashesKey.room(roomId),
       RedisHashesField.member(),
       members,
     );
@@ -129,7 +129,7 @@ export class GameRoomEventService {
   }
 
   // 멤버 중복 체크 후 존재하지 않는 멤버라면 추가
-  addMember(members: Member[], member: Member) {
+  addMember(members: Member[], member: Member): void {
     const exMember = this.getMemberInGameRoomMember(members, member.userId);
     if (!exMember) {
       members.push(member);
@@ -140,7 +140,7 @@ export class GameRoomEventService {
   async findMembersByRoomId(roomId: number): Promise<Member[]> {
     const members =
       (await this.redisService.hget(
-        RedisHashesKey.game(roomId),
+        RedisHashesKey.room(roomId),
         RedisHashesField.member(),
       )) || [];
 
@@ -188,7 +188,7 @@ export class GameRoomEventService {
   // 방 정보 찾기
   async findOneOfRoomInfo(roomId: number): Promise<GameRoom> {
     return await this.redisService.hget(
-      RedisHashesKey.game(roomId),
+      RedisHashesKey.room(roomId),
       RedisHashesField.roomInfo(),
     );
   }
@@ -209,7 +209,7 @@ export class GameRoomEventService {
 
     const newMembers = members.filter((member) => member.userId !== memberId);
     await this.saveMembers(
-      RedisHashesKey.game(roomId),
+      RedisHashesKey.room(roomId),
       RedisHashesField.member(),
       newMembers,
     );
@@ -218,7 +218,7 @@ export class GameRoomEventService {
   }
   // 방 삭제
   async remove(roomId: number): Promise<object> {
-    await this.redisService.del(RedisHashesKey.game(roomId));
+    await this.redisService.del(RedisHashesKey.room(roomId));
     try {
       await this.janusService.destroyJanusRoom(roomId);
     } catch (error) {
@@ -257,7 +257,7 @@ export class GameRoomEventService {
       }
     }
     await this.saveMembers(
-      RedisHashesKey.game(roomId),
+      RedisHashesKey.room(roomId),
       RedisHashesField.member(),
       members,
     );

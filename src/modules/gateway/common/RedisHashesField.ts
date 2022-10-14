@@ -1,41 +1,41 @@
 export class RedisHashesField {
-  public static day() {
+  public static day(): string {
     return 'day';
   }
-  public static vote(day: number) {
+  public static vote(day: number): string {
     return `vote:${day}`;
   }
-  public static punish(day: number) {
+  public static punish(day: number): string {
     return `punish:${day}`;
   }
-  public static punishPlayer(day: number) {
+  public static punishPlayer(day: number): string {
     return `punishPlayer:${day}`;
   }
-  public static turn() {
+  public static turn(): string {
     return 'turn';
   }
-  public static player() {
+  public static player(): string {
     return 'player';
   }
-  public static joinCount() {
+  public static joinCount(): string {
     return 'joinCount';
   }
-  public static startCount() {
+  public static startCount(): string {
     return 'startCount';
   }
-  public static member() {
+  public static member(): string {
     return 'member';
   }
-  public static roomInfo() {
+  public static roomInfo(): string {
     return 'roomInfo';
   }
-  public static mafiaSKill(day: number) {
+  public static mafiaSKill(day: number): string {
     return `mafiaSkill:${day}`;
   }
-  public static doctorSkill(day: number) {
+  public static doctorSkill(day: number): string {
     return `doctorSkill:${day}`;
   }
-  public static policeSkill(day: number) {
+  public static policeSkill(day: number): string {
     return `policeSkill:${day}`;
   }
 }
