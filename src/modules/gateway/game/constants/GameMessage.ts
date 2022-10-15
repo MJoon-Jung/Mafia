@@ -9,10 +9,13 @@ export class GameMessage {
     return '사형 찬반 투표가 부결되었습니다.';
   }
   public static VOTE_RESULT_MAJORITY(nickname: string): string {
-    return `${nickname}님이 과반수 이상의 투표를 받았습니다.`;
+    return `플레이어 지목 투표 결과 ${nickname}님이 과반수 이상입니다.`;
+  }
+  public static VOTE_RESULT_TIE(): string {
+    return '플레이어 지목 투표 결과 동률입니다.';
   }
   public static VOTE_RESULT_NOT_MAJORITY(): string {
-    return '플레이어 지목 투표가 부결되었습니다.';
+    return '플레이어 지목 투표 결과 부결되었습니다.';
   }
   public static NIGHT_NOT_SKILL(): string {
     return '평화로운 밤이었습니다.';

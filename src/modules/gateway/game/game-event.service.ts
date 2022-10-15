@@ -109,20 +109,23 @@ export class GameEventService {
     /**
      * 시민팀 마피아팀 둘 중 누가 다 죽었나 체크
      */
-    let citizenTeamLose = true;
-    let mafiaTeamLose = true;
-    players.forEach((player) => {
-      if (player.job === EnumGameRole.MAFIA && !player.die) {
-        citizenTeamLose = false;
-      } else if (player.job !== EnumGameRole.MAFIA && !player.die) {
-        mafiaTeamLose = false;
-      }
-    });
-    if (citizenTeamLose) {
+    const { citizen, mafia } = players.reduce(
+      (acc, cur) => {
+        if (cur.die) return acc;
+        if (cur.team === EnumGameTeam.CITIZEN) {
+          acc.citizen++;
+        } else if (cur.team === EnumGameTeam.MAFIA) {
+          acc.mafia++;
+        }
+        return acc;
+      },
+      { citizen: 0, mafia: 0 },
+    );
+    if (!mafia) {
       await this.gameRepository.saveGameScore(players, EnumGameTeam.CITIZEN);
       return { win: EnumGameTeam.CITIZEN };
     }
-    if (mafiaTeamLose) {
+    if (mafia >= citizen) {
       await this.gameRepository.saveGameScore(players, EnumGameTeam.MAFIA);
       return { win: EnumGameTeam.MAFIA };
     }

@@ -21,7 +21,18 @@ export class BallotBox {
     return Object.keys(this.votingResult).length;
   }
   public majorityVote(players: number): boolean {
-    return this.highestNumberOfVotes() > Math.round(players / 2);
+    return this.highestNumberOfVotes() >= Math.round(players / 2);
+  }
+  public tieTheVote(): boolean {
+    let count = 0;
+    const max = this.highestNumberOfVotes();
+    for (const playerVideoNum in Object.keys(this.votingResult)) {
+      if (this.votingResult[playerVideoNum] === max) count++;
+    }
+    if (count > 1) {
+      return true;
+    }
+    return false;
   }
   public static from(result: VotingResult): BallotBox {
     return new BallotBox(result);

@@ -188,7 +188,13 @@ export class GameGateway
             day,
             players.length,
           );
-          if (
+          if (ballotBox.tieTheVote()) {
+            await that.gameEventService.setStatus(roomId, GameTurn.NIGHT);
+            that.server.to(socketRoom).emit(GameEvent.VOTE, {
+              playerVideoNum: null,
+              message: GameMessage.VOTE_RESULT_TIE(),
+            });
+          } else if (
             ballotBox.majorityVote(
               that.gameEventService.getLivingPlayerCount(players),
             )
@@ -197,6 +203,10 @@ export class GameGateway
               players[ballotBox.electedPlayerVideoNum() - 1];
             if (votedPlayer.die)
               throw new WsException('이미 죽은 플레이어입니다.');
+            that.logger.log(
+              '============votedPlayer============' +
+                JSON.stringify(votedPlayer),
+            );
 
             await that.gameEventService.setPunishedPlayer(
               roomId,
@@ -287,6 +297,7 @@ export class GameGateway
             }
             that.server.to(socketRoom).emit(GameEvent.PUNISH, data);
             // 승리 조건 검사 후 게임 END
+            //Todo 탈주자 처리 다시 생각
             const result =
               await that.gameEventService.haveNecessaryConditionOfWinning(
                 players,
@@ -375,6 +386,12 @@ export class GameGateway
     );
     if (!maybePlayer) {
       throw new WsException('게임 플레이어가 아닙니다');
+    }
+    const votedPlayer = players.find(
+      (_, idx) => idx === data.playerVideoNum - 1,
+    );
+    if (votedPlayer.die) {
+      throw new WsException('이미 죽은 플레이어입니다.');
     }
     const day = await this.gameEventService.getDay(roomId);
     await this.gameEventService.setVote(roomId, day, data.playerVideoNum);
@@ -528,7 +545,6 @@ export class GameGateway
         this.server.to(`${socketRoom}-${roomId}`).emit(GameEvent.END, result);
       }, 1000);
       await this.gameEventService.deleteGame(roomId);
-      return;
     }
   }
 }
