@@ -1,3 +1,4 @@
+/* eslint-disable prettier/prettier */
 import { ApiProperty } from '@nestjs/swagger';
 import { IsDate, IsInt, IsNotEmpty } from 'class-validator';
 import {
@@ -74,7 +75,7 @@ export class GameMember {
     description: '게임 역할 이름',
   })
   @Column({
-    enum: EnumGameRole,
+    type: 'varchar',
     name: 'game_role_name',
     nullable: true,
   })
@@ -95,8 +96,7 @@ export class GameMember {
   })
   @IsNotEmpty()
   @Column({
-    type: 'enum',
-    enum: GameStatus,
+    type: 'varchar',
     name: 'score',
     default: GameStatus.PENDING,
   })

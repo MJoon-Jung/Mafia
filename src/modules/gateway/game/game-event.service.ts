@@ -244,10 +244,8 @@ export class GameEventService {
 
   private shuffle(jobs: EnumGameRole[]): EnumGameRole[] {
     for (let i = jobs.length - 1; i > 0; i--) {
-      const randomIdx = Math.floor(Math.random() * (i + 1));
-      const temp = jobs[i];
-      jobs[i] = jobs[randomIdx];
-      jobs[randomIdx] = temp;
+      const j = Math.floor(Math.random() * (i + 1));
+      [jobs[i], jobs[j]] = [jobs[j], jobs[i]];
     }
     return jobs;
   }

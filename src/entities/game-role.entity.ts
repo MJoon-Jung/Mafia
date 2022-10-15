@@ -1,10 +1,10 @@
+/* eslint-disable prettier/prettier */
 import { ApiProperty } from '@nestjs/swagger';
 import { IsDate, IsEnum, IsInt, IsNotEmpty } from 'class-validator';
 import {
   Column,
   CreateDateColumn,
   Entity,
-  Index,
   OneToMany,
   PrimaryColumn,
   UpdateDateColumn,
@@ -27,9 +27,7 @@ export class GameRole {
     example: 'CITIZEN',
     description: '게임 역할 이름',
   })
-  @IsEnum(EnumGameRole)
-  @IsNotEmpty()
-  @Column({ type: 'enum', enum: EnumGameRole, name: 'name', unique: true })
+  @Column({ type: 'varchar', name: 'name', unique: true })
   name: EnumGameRole;
 
   @IsDate()

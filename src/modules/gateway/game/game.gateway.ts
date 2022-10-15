@@ -28,6 +28,7 @@ import { RedisHashesKey } from 'src/modules/gateway/common/RedisHashesKey';
 import { RedisHashesField } from 'src/modules/gateway/common/RedisHashesField';
 import { PunishBallotBox } from 'src/modules/gateway/game/PunishBallotBox';
 import { GameMessage } from 'src/modules/gateway/game/constants/GameMessage';
+import { GameTime } from 'src/modules/gateway/game/constants/GameTime';
 
 dayjs.locale('ko');
 dayjs.extend(customParseFormat);
@@ -87,6 +88,7 @@ export class GameGateway
     // 굳이 보낼 필요 있나?
     this.server.to(`${socket.nsp.name}-${roomId}`).emit(GameEvent.JOIN);
   }
+
   @SubscribeMessage(GameEvent.START)
   async handleGameStart(@ConnectedSocket() socket: AuthenticatedSocket) {
     /**
@@ -139,8 +141,8 @@ export class GameGateway
      */
     const turn: GameTurn = await this.gameEventService.getGameTurn(roomId);
     const day: number = await this.gameEventService.getDay(roomId);
-    let time = 60;
     if (turn === GameTurn.MEETING) {
+      let time = GameTime.MEETING_TIME;
       /**
        * 할 거 없음
        */
@@ -150,7 +152,7 @@ export class GameGateway
           server: Server,
           startTimer: Function,
         ) {
-          if (time-- >= 0) {
+          if (time-- > 0) {
             server
               .to(socketRoom)
               .emit(GameEvent.TIMER, { time, status: turn, day });
@@ -161,8 +163,8 @@ export class GameGateway
            * turn 변경 및 startTimer 실행
            */
           await gameEventService.setStatus(roomId, GameTurn.VOTE);
-          await startTimer();
-        },
+          await startTimer(roomId, socketRoom);
+        }.bind(this),
         1000,
         this.gameEventService,
         this.server,
@@ -172,13 +174,14 @@ export class GameGateway
       /**
        * 할 거 없음
        */
+      let time = GameTime.VOTE_TIME;
       setTimeout(
         async function run(
           gameEventService: GameEventService,
           server: Server,
           startTimer: Function,
         ) {
-          if (time-- >= 0) {
+          if (time-- > 0) {
             server
               .to(socketRoom)
               .emit(GameEvent.TIMER, { time, status: turn, day });
@@ -215,7 +218,7 @@ export class GameGateway
               message: GameMessage.VOTE_RESULT_NOT_MAJORITY(),
             });
           }
-          await startTimer();
+          await startTimer(roomId, socketRoom);
         },
         1000,
         this.gameEventService,
@@ -226,13 +229,14 @@ export class GameGateway
       /**
        * 할 거 없음
        */
+      let time = GameTime.PUNISH_TIME;
       setTimeout(
         async function run(
           gameEventService: GameEventService,
           server: Server,
           startTimer: Function,
         ) {
-          if (time-- >= 0) {
+          if (time-- > 0) {
             server
               .to(socketRoom)
               .emit(GameEvent.TIMER, { time, status: turn, day });
@@ -303,7 +307,7 @@ export class GameGateway
             };
           }
           await gameEventService.setStatus(roomId, GameTurn.NIGHT);
-          await startTimer();
+          await startTimer(roomId, socketRoom);
         },
         1000,
         this.gameEventService,
@@ -311,13 +315,14 @@ export class GameGateway
         this.startTimer,
       );
     } else if (turn === GameTurn.NIGHT) {
+      let time = GameTime.NIGHT_TIME;
       setTimeout(
         async function run(
           gameEventService: GameEventService,
           server: Server,
           startTimer: Function,
         ) {
-          if (time-- >= 0) {
+          if (time-- > 0) {
             server
               .to(socketRoom)
               .emit(GameEvent.TIMER, { time, status: turn, day });
@@ -352,7 +357,7 @@ export class GameGateway
             }
           }
           await gameEventService.setStatus(roomId, GameTurn.MEETING);
-          await startTimer();
+          await startTimer(roomId, socketRoom);
         },
         1000,
         this.gameEventService,
