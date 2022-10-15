@@ -147,28 +147,22 @@ export class GameGateway
        * 할 거 없음
        */
       setTimeout(
-        async function run(
-          gameEventService: GameEventService,
-          server: Server,
-          startTimer: Function,
-        ) {
+        async function run(that: GameGateway) {
           if (time-- > 0) {
-            server
+            that.server
               .to(socketRoom)
               .emit(GameEvent.TIMER, { time, status: turn, day });
-            setTimeout(run, 1000, gameEventService, server, startTimer);
+            setTimeout(run, 1000, that);
             return;
           }
           /**
            * turn 변경 및 startTimer 실행
            */
-          await gameEventService.setStatus(roomId, GameTurn.VOTE);
-          await startTimer(roomId, socketRoom);
+          await that.gameEventService.setStatus(roomId, GameTurn.VOTE);
+          await that.startTimer(roomId, socketRoom);
         }.bind(this),
         1000,
-        this.gameEventService,
-        this.server,
-        this.startTimer,
+        this,
       );
     } else if (turn === GameTurn.VOTE) {
       /**
@@ -176,27 +170,26 @@ export class GameGateway
        */
       let time = GameTime.VOTE_TIME;
       setTimeout(
-        async function run(
-          gameEventService: GameEventService,
-          server: Server,
-          startTimer: Function,
-        ) {
+        async function run(that: GameGateway) {
           if (time-- > 0) {
-            server
+            that.server
               .to(socketRoom)
               .emit(GameEvent.TIMER, { time, status: turn, day });
-            setTimeout(run, 1000, gameEventService, server, startTimer);
+            setTimeout(run, 1000, that);
             return;
           }
           /**
            * vote 결과 종합 후 다음 턴 계산해서 바꿔줌
            */
-          const ballotBox = await gameEventService.getBallotBox(roomId, day);
+          const ballotBox = await that.gameEventService.getBallotBox(
+            roomId,
+            day,
+          );
 
-          const players = await gameEventService.findPlayers(roomId);
+          const players = await that.gameEventService.findPlayers(roomId);
           if (
             ballotBox.majorityVote(
-              gameEventService.getLivingPlayerCount(players),
+              that.gameEventService.getLivingPlayerCount(players),
             )
           ) {
             const votedPlayer: Player =
@@ -204,26 +197,28 @@ export class GameGateway
             if (votedPlayer.die)
               throw new WsException('이미 죽은 플레이어입니다.');
 
-            await gameEventService.setPunishedPlayer(roomId, day, votedPlayer);
-            await gameEventService.setStatus(roomId, GameTurn.PUNISHMENT);
+            await that.gameEventService.setPunishedPlayer(
+              roomId,
+              day,
+              votedPlayer,
+            );
+            await that.gameEventService.setStatus(roomId, GameTurn.PUNISHMENT);
 
-            server.to(socketRoom).emit(GameEvent.VOTE, {
+            that.server.to(socketRoom).emit(GameEvent.VOTE, {
               playerVideoNum: ballotBox.electedPlayerVideoNum(),
               message: GameMessage.VOTE_RESULT_MAJORITY(votedPlayer.nickname),
             });
           } else {
-            await gameEventService.setStatus(roomId, GameTurn.NIGHT);
-            server.to(socketRoom).emit(GameEvent.VOTE, {
+            await that.gameEventService.setStatus(roomId, GameTurn.NIGHT);
+            that.server.to(socketRoom).emit(GameEvent.VOTE, {
               playerVideoNum: null,
               message: GameMessage.VOTE_RESULT_NOT_MAJORITY(),
             });
           }
-          await startTimer(roomId, socketRoom);
+          await that.startTimer(roomId, socketRoom);
         },
         1000,
-        this.gameEventService,
-        this.server,
-        this.startTimer,
+        this,
       );
     } else if (turn === GameTurn.PUNISHMENT) {
       /**
@@ -231,16 +226,12 @@ export class GameGateway
        */
       let time = GameTime.PUNISH_TIME;
       setTimeout(
-        async function run(
-          gameEventService: GameEventService,
-          server: Server,
-          startTimer: Function,
-        ) {
+        async function run(that: GameGateway) {
           if (time-- > 0) {
-            server
+            that.server
               .to(socketRoom)
               .emit(GameEvent.TIMER, { time, status: turn, day });
-            setTimeout(run, 1000, gameEventService, server, startTimer);
+            setTimeout(run, 1000, that);
             return;
           }
           /**
@@ -249,9 +240,9 @@ export class GameGateway
            * 처형됐다면 승리 조건 검사
            * turn night로 변경
            */
-          const result = await gameEventService.getPunishVote(roomId, day);
+          const result = await that.gameEventService.getPunishVote(roomId, day);
           const punishBallotBox = PunishBallotBox.of(result);
-          const players = await gameEventService.findPlayers(roomId);
+          const players = await that.gameEventService.findPlayers(roomId);
           let data: {
             result: boolean;
             playerVideoNum: number;
@@ -259,11 +250,11 @@ export class GameGateway
           };
           if (
             punishBallotBox.majorityVote(
-              gameEventService.getLivingPlayerCount(players),
+              that.gameEventService.getLivingPlayerCount(players),
             )
           ) {
             const punishedPlayer: Player =
-              await gameEventService.getPunishedPlayer(roomId, day);
+              await that.gameEventService.getPunishedPlayer(roomId, day);
 
             // 죽음 처리 저장
             let playerVideoNum: number;
@@ -273,7 +264,7 @@ export class GameGateway
                 playerVideoNum = idx + 1;
               }
             });
-            gameEventService.setPlayers(roomId, players);
+            that.gameEventService.setPlayers(roomId, players);
             // socket 데이터 전송
             if (punishedPlayer.job === EnumGameRole.MAFIA) {
               data = {
@@ -288,15 +279,17 @@ export class GameGateway
                 message: GameMessage.PUNISH_RESULT_CITIZEN(),
               };
             }
-            server.to(socketRoom).emit(GameEvent.PUNISH, data);
+            that.server.to(socketRoom).emit(GameEvent.PUNISH, data);
             // 승리 조건 검사 후 게임 END
             const result =
-              await gameEventService.haveNecessaryConditionOfWinning(players);
+              await that.gameEventService.haveNecessaryConditionOfWinning(
+                players,
+              );
             if (result.win) {
               setTimeout(() => {
-                server.to(socketRoom).emit(GameEvent.END, result);
+                that.server.to(socketRoom).emit(GameEvent.END, result);
               }, 2000);
-              await gameEventService.deleteGame(roomId);
+              await that.gameEventService.deleteGame(roomId);
               return;
             }
           } else {
@@ -306,63 +299,59 @@ export class GameGateway
               message: GameMessage.PUNISH_NOT_MAJORITY(),
             };
           }
-          await gameEventService.setStatus(roomId, GameTurn.NIGHT);
-          await startTimer(roomId, socketRoom);
+          await that.gameEventService.setStatus(roomId, GameTurn.NIGHT);
+          await that.startTimer(roomId, socketRoom);
         },
         1000,
-        this.gameEventService,
-        this.server,
-        this.startTimer,
+        this,
       );
     } else if (turn === GameTurn.NIGHT) {
       let time = GameTime.NIGHT_TIME;
       setTimeout(
-        async function run(
-          gameEventService: GameEventService,
-          server: Server,
-          startTimer: Function,
-        ) {
+        async function run(that: GameGateway) {
           if (time-- > 0) {
-            server
+            that.server
               .to(socketRoom)
               .emit(GameEvent.TIMER, { time, status: turn, day });
-            setTimeout(run, 1000, gameEventService, server, startTimer);
+            setTimeout(run, 1000, that);
             return;
           }
           /**
            * 밤 능력 종합 후 게임 승리 조건 검사한 후 타이머 실행한다.
            */
-          const result = await gameEventService.getSkillResult(roomId, day);
-          server.to(socketRoom).emit(GameEvent.SKILL, result);
+          const result = await that.gameEventService.getSkillResult(
+            roomId,
+            day,
+          );
+          that.server.to(socketRoom).emit(GameEvent.SKILL, result);
 
           if (result.die) {
-            const players = await gameEventService.findPlayers(roomId);
+            const players = await that.gameEventService.findPlayers(roomId);
             // 죽음 처리
             players.forEach((player) => {
               if (player.id === result.playerVideoNum) {
                 player.die = true;
               }
             });
-            gameEventService.setPlayers(roomId, players);
+            that.gameEventService.setPlayers(roomId, players);
             // 승리 조건 검사
-            const data = await gameEventService.haveNecessaryConditionOfWinning(
-              players,
-            );
+            const data =
+              await that.gameEventService.haveNecessaryConditionOfWinning(
+                players,
+              );
             if (data.win) {
               setTimeout(() => {
-                server.to(socketRoom).emit(GameEvent.END, data);
+                that.server.to(socketRoom).emit(GameEvent.END, data);
               }, 2000);
-              await gameEventService.deleteGame(roomId);
+              await that.gameEventService.deleteGame(roomId);
               return;
             }
           }
-          await gameEventService.setStatus(roomId, GameTurn.MEETING);
-          await startTimer(roomId, socketRoom);
+          await that.gameEventService.setStatus(roomId, GameTurn.MEETING);
+          await that.startTimer(roomId, socketRoom);
         },
         1000,
-        this.gameEventService,
-        this.server,
-        this.startTimer,
+        this,
       );
     }
   }
