@@ -106,7 +106,7 @@ export class GameGateway
     }
     const count = await this.redisService.hincrby(
       RedisHashesKey.game(roomId),
-      RedisHashesField.joinCount(),
+      RedisHashesField.startCount(),
     );
 
     players.forEach((player) => {
@@ -149,6 +149,7 @@ export class GameGateway
       setTimeout(
         async function run(that: GameGateway) {
           if (time-- > 0) {
+            that.logger.log(`time: ${time}, status: ${turn}, day: ${day}`);
             that.server
               .to(socketRoom)
               .emit(GameEvent.TIMER, { time, status: turn, day });
@@ -160,7 +161,7 @@ export class GameGateway
            */
           await that.gameEventService.setStatus(roomId, GameTurn.VOTE);
           await that.startTimer(roomId, socketRoom);
-        }.bind(this),
+        },
         1000,
         this,
       );
@@ -172,6 +173,7 @@ export class GameGateway
       setTimeout(
         async function run(that: GameGateway) {
           if (time-- > 0) {
+            that.logger.log(`time: ${time}, status: ${turn}, day: ${day}`);
             that.server
               .to(socketRoom)
               .emit(GameEvent.TIMER, { time, status: turn, day });
@@ -228,6 +230,7 @@ export class GameGateway
       setTimeout(
         async function run(that: GameGateway) {
           if (time-- > 0) {
+            that.logger.log(`time: ${time}, status: ${turn}, day: ${day}`);
             that.server
               .to(socketRoom)
               .emit(GameEvent.TIMER, { time, status: turn, day });
@@ -310,6 +313,7 @@ export class GameGateway
       setTimeout(
         async function run(that: GameGateway) {
           if (time-- > 0) {
+            that.logger.log(`time: ${time}, status: ${turn}, day: ${day}`);
             that.server
               .to(socketRoom)
               .emit(GameEvent.TIMER, { time, status: turn, day });
@@ -347,6 +351,7 @@ export class GameGateway
               return;
             }
           }
+          await that.gameEventService.setDay(roomId);
           await that.gameEventService.setStatus(roomId, GameTurn.MEETING);
           await that.startTimer(roomId, socketRoom);
         },
