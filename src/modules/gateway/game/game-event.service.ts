@@ -22,12 +22,36 @@ export class GameEventService {
     private readonly redisService: RedisService,
     private readonly gameRepository: GameRepository,
   ) {}
+  async getGameInfo(roomId: number) {
+    return await this.redisService.hget(
+      RedisHashesKey.game(roomId),
+      RedisHashesField.roomInfo(),
+    );
+  }
   async leave(roomId: number, playerId: number) {
     const players = await this.findPlayers(roomId);
     const player = players.find((player) => player.id === playerId);
     player.setDie(true);
     await this.setPlayers(roomId, players);
+    await this.setEscapePlayer(roomId, playerId);
     await this.gameRepository.leave(player);
+  }
+  async setEscapePlayer(roomId: number, playerId: number) {
+    const escapePlayers = await this.getEscapePlayer(roomId);
+    escapePlayers.push(playerId);
+    await this.redisService.hset(
+      RedisHashesKey.game(roomId),
+      RedisHashesField.escapePlayer(),
+      escapePlayers,
+    );
+  }
+  async getEscapePlayer(roomId: number): Promise<number[]> {
+    return (
+      (await this.redisService.hget(
+        RedisHashesKey.game(roomId),
+        RedisHashesField.escapePlayer(),
+      )) || []
+    );
   }
   async getSkillResult(
     roomId: number,
@@ -103,7 +127,10 @@ export class GameEventService {
     });
     return count;
   }
-  async haveNecessaryConditionOfWinning(players: Player[]): Promise<{
+  async haveNecessaryConditionOfWinning(
+    players: Player[],
+    roomId: number,
+  ): Promise<{
     win: EnumGameTeam | null;
   }> {
     /**
@@ -121,12 +148,22 @@ export class GameEventService {
       },
       { citizen: 0, mafia: 0 },
     );
+    const escapePlayers = await this.getEscapePlayer(roomId);
+    const notEscapePlayers = players.filter(
+      (player) => !escapePlayers.includes(player.id),
+    );
     if (!mafia) {
-      await this.gameRepository.saveGameScore(players, EnumGameTeam.CITIZEN);
+      await this.gameRepository.saveGameScore(
+        notEscapePlayers,
+        EnumGameTeam.CITIZEN,
+      );
       return { win: EnumGameTeam.CITIZEN };
     }
     if (mafia >= citizen) {
-      await this.gameRepository.saveGameScore(players, EnumGameTeam.MAFIA);
+      await this.gameRepository.saveGameScore(
+        notEscapePlayers,
+        EnumGameTeam.MAFIA,
+      );
       return { win: EnumGameTeam.MAFIA };
     }
     return { win: null };

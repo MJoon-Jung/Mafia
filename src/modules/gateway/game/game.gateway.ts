@@ -301,6 +301,7 @@ export class GameGateway
             const result =
               await that.gameEventService.haveNecessaryConditionOfWinning(
                 players,
+                roomId,
               );
             if (result.win) {
               setTimeout(() => {
@@ -356,6 +357,7 @@ export class GameGateway
             const data =
               await that.gameEventService.haveNecessaryConditionOfWinning(
                 players,
+                roomId,
               );
             if (data.win) {
               setTimeout(() => {
@@ -534,11 +536,17 @@ export class GameGateway
   }
   afterInit(server: any) {}
   async leave(roomId: number, socketRoom: string, playerId: number) {
+    //Todo 게임이 끝나고 나갈 때도 소켓이 끊길텐데 처리를 어떻게 할 것 인가.
+    const info = await this.gameEventService.getGameInfo(roomId);
+    if (!info) {
+      return;
+    }
     await this.gameEventService.leave(roomId, playerId);
     this.server.to(socketRoom).emit(GameEvent.LEAVE, { playerId });
     const players = await this.gameEventService.findPlayers(roomId);
     const result = await this.gameEventService.haveNecessaryConditionOfWinning(
       players,
+      roomId,
     );
     if (result.win) {
       setTimeout(() => {

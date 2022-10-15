@@ -38,4 +38,7 @@ export class RedisHashesField {
   public static policeSkill(day: number): string {
     return `policeSkill:${day}`;
   }
+  public static escapePlayer(): string {
+    return 'escapePlayer';
+  }
 }
