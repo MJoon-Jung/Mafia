@@ -142,17 +142,16 @@ export class GameGateway
     const turn: GameTurn = await this.gameEventService.getGameTurn(roomId);
     const day: number = await this.gameEventService.getDay(roomId);
     if (turn === GameTurn.MEETING) {
-      let time = GameTime.MEETING_TIME;
+      let timer = GameTime.MEETING_TIME;
       /**
        * 할 거 없음
        */
       setTimeout(
         async function run(that: GameGateway) {
-          if (time-- > 0) {
-            that.logger.log(`time: ${time}, status: ${turn}, day: ${day}`);
+          if (timer-- > 0) {
             that.server
               .to(socketRoom)
-              .emit(GameEvent.TIMER, { time, status: turn, day });
+              .emit(GameEvent.TIMER, { timer, status: turn, day });
             setTimeout(run, 1000, that);
             return;
           }
@@ -169,14 +168,13 @@ export class GameGateway
       /**
        * 할 거 없음
        */
-      let time = GameTime.VOTE_TIME;
+      let timer = GameTime.VOTE_TIME;
       setTimeout(
         async function run(that: GameGateway) {
-          if (time-- > 0) {
-            that.logger.log(`time: ${time}, status: ${turn}, day: ${day}`);
+          if (timer-- > 0) {
             that.server
               .to(socketRoom)
-              .emit(GameEvent.TIMER, { time, status: turn, day });
+              .emit(GameEvent.TIMER, { timer, status: turn, day });
             setTimeout(run, 1000, that);
             return;
           }
@@ -226,14 +224,13 @@ export class GameGateway
       /**
        * 할 거 없음
        */
-      let time = GameTime.PUNISH_TIME;
+      let timer = GameTime.PUNISH_TIME;
       setTimeout(
         async function run(that: GameGateway) {
-          if (time-- > 0) {
-            that.logger.log(`time: ${time}, status: ${turn}, day: ${day}`);
+          if (timer-- > 0) {
             that.server
               .to(socketRoom)
-              .emit(GameEvent.TIMER, { time, status: turn, day });
+              .emit(GameEvent.TIMER, { timer, status: turn, day });
             setTimeout(run, 1000, that);
             return;
           }
@@ -309,14 +306,13 @@ export class GameGateway
         this,
       );
     } else if (turn === GameTurn.NIGHT) {
-      let time = GameTime.NIGHT_TIME;
+      let timer = GameTime.NIGHT_TIME;
       setTimeout(
         async function run(that: GameGateway) {
-          if (time-- > 0) {
-            that.logger.log(`time: ${time}, status: ${turn}, day: ${day}`);
+          if (timer-- > 0) {
             that.server
               .to(socketRoom)
-              .emit(GameEvent.TIMER, { time, status: turn, day });
+              .emit(GameEvent.TIMER, { timer, status: turn, day });
             setTimeout(run, 1000, that);
             return;
           }
