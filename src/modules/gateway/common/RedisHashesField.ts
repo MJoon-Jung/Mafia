@@ -2,8 +2,8 @@ export class RedisHashesField {
   public static day(): string {
     return 'day';
   }
-  public static vote(day: number): string {
-    return `vote:${day}`;
+  public static vote(day: number, playerVideoNum?: number): string {
+    return `vote:${day}:${playerVideoNum}`;
   }
   public static punish(day: number): string {
     return `punish:${day}`;

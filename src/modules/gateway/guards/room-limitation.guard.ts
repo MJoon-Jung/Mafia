@@ -27,9 +27,6 @@ export class RoomLimitationGuard implements CanActivate {
     );
 
     if (publishers <= members.length) {
-      console.log(
-        `publishers: ${publishers} / members.length: ${members.length}`,
-      );
       throw new WsException('방의 인원이 초과되었습니다');
     }
     return true;

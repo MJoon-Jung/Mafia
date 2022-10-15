@@ -181,12 +181,13 @@ export class GameGateway
           /**
            * vote 결과 종합 후 다음 턴 계산해서 바꿔줌
            */
+
+          const players = await that.gameEventService.findPlayers(roomId);
           const ballotBox = await that.gameEventService.getBallotBox(
             roomId,
             day,
+            players.length,
           );
-
-          const players = await that.gameEventService.findPlayers(roomId);
           if (
             ballotBox.majorityVote(
               that.gameEventService.getLivingPlayerCount(players),
@@ -248,6 +249,7 @@ export class GameGateway
             playerVideoNum: number;
             message: string;
           };
+
           if (
             punishBallotBox.majorityVote(
               that.gameEventService.getLivingPlayerCount(players),
@@ -255,6 +257,10 @@ export class GameGateway
           ) {
             const punishedPlayer: Player =
               await that.gameEventService.getPunishedPlayer(roomId, day);
+            that.logger.log(
+              '============punishedPlayer============' +
+                JSON.stringify(punishedPlayer),
+            );
 
             // 죽음 처리 저장
             let playerVideoNum: number;
@@ -298,6 +304,7 @@ export class GameGateway
               playerVideoNum: null,
               message: GameMessage.PUNISH_NOT_MAJORITY(),
             };
+            that.server.to(socketRoom).emit(GameEvent.PUNISH, data);
           }
           await that.gameEventService.setStatus(roomId, GameTurn.NIGHT);
           await that.startTimer(roomId, socketRoom);

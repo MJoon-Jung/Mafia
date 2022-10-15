@@ -23,7 +23,6 @@ export class UserEventService {
     const result = [];
     for (const friend of friends) {
       const online = await this.getOnline(friend.userId);
-      console.log('online', online);
       if (online) {
         result.push(`/user-${friend.userId}`);
       }

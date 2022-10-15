@@ -155,13 +155,14 @@ export class GameEventService {
       RedisHashesField.punish(day),
     );
   }
-  async setVote(roomId: number, day: number, playerNum: number): Promise<void> {
-    const ballotBox = await this.getBallotBox(roomId, day);
-    ballotBox.vote(playerNum);
-    await this.redisService.hset(
+  async setVote(
+    roomId: number,
+    day: number,
+    playerVideoNum: number,
+  ): Promise<void> {
+    await this.redisService.hincrby(
       RedisHashesKey.game(roomId),
-      RedisHashesField.vote(day),
-      ballotBox.getVotingResult(),
+      RedisHashesField.vote(day, playerVideoNum),
     );
   }
   async getPunishedPlayer(roomId: number, day: number): Promise<Player> {
@@ -181,13 +182,20 @@ export class GameEventService {
       votedPlayer,
     );
   }
-  async getBallotBox(roomId: number, day: number): Promise<BallotBox> {
-    const votingResult =
-      (await this.redisService.hget(
+  async getBallotBox(
+    roomId: number,
+    day: number,
+    numberOfPlayer: number,
+  ): Promise<BallotBox> {
+    const result: { [key: string]: number } = {};
+    for (let i = 1; i <= numberOfPlayer; i++) {
+      const count = await this.redisService.hget(
         RedisHashesKey.game(roomId),
-        RedisHashesField.vote(day),
-      )) || {};
-    return BallotBox.from(votingResult);
+        RedisHashesField.vote(day, i),
+      );
+      result[i] = count;
+    }
+    return BallotBox.from(result);
   }
   async getGameTurn(roomId: number): Promise<GameTurn> {
     return await this.redisService.hget(
