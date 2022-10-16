@@ -29,9 +29,15 @@ export class GameEventService {
     );
   }
   async leave(roomId: number, playerId: number) {
+    this.logger.log(`gameEventService leave event leave`);
     const players = await this.findPlayers(roomId);
     const player = players.find((player) => player.id === playerId);
-    player.setDie(true);
+    this.logger.log(
+      `playerId: ${playerId} gameEventService player: ${JSON.stringify(
+        player,
+      )}`,
+    );
+    player.die = true;
     await this.setPlayers(roomId, players);
     await this.setEscapePlayer(roomId, playerId);
     await this.gameRepository.leave(player);
@@ -132,6 +138,7 @@ export class GameEventService {
     roomId: number,
   ): Promise<{
     win: EnumGameTeam | null;
+    message: string | null;
   }> {
     /**
      * 시민팀 마피아팀 둘 중 누가 다 죽었나 체크
@@ -148,25 +155,28 @@ export class GameEventService {
       },
       { citizen: 0, mafia: 0 },
     );
+    this.logger.log(`citize: ${citizen} mafia: ${mafia}`);
     const escapePlayers = await this.getEscapePlayer(roomId);
+    this.logger.log(`escape players: ${JSON.stringify(escapePlayers)}`);
     const notEscapePlayers = players.filter(
       (player) => !escapePlayers.includes(player.id),
     );
+    this.logger.log(`not escape players: ${JSON.stringify(notEscapePlayers)}`);
     if (!mafia) {
       await this.gameRepository.saveGameScore(
         notEscapePlayers,
         EnumGameTeam.CITIZEN,
       );
-      return { win: EnumGameTeam.CITIZEN };
+      return { win: EnumGameTeam.CITIZEN, message: GameMessage.CITIZEN_WIN() };
     }
     if (mafia >= citizen) {
       await this.gameRepository.saveGameScore(
         notEscapePlayers,
         EnumGameTeam.MAFIA,
       );
-      return { win: EnumGameTeam.MAFIA };
+      return { win: EnumGameTeam.MAFIA, message: GameMessage.MAFIA_WIN() };
     }
-    return { win: null };
+    return { win: null, message: null };
   }
   async deleteGame(roomId: number) {
     await this.redisService.del(RedisHashesKey.game(roomId));

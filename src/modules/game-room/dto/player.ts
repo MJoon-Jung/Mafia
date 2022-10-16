@@ -62,8 +62,4 @@ export class Player {
     this.team = null;
     this.gameId = null;
   }
-
-  public setDie(die: boolean) {
-    this.die = die;
-  }
 }

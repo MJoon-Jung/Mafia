@@ -158,6 +158,10 @@ export class GameGateway
           /**
            * turn 변경 및 startTimer 실행
            */
+          if (await that.gameIsEnded(roomId)) {
+            return;
+          }
+
           await that.gameEventService.setStatus(roomId, GameTurn.VOTE);
           await that.startTimer(roomId, socketRoom);
         },
@@ -181,6 +185,9 @@ export class GameGateway
           /**
            * vote 결과 종합 후 다음 턴 계산해서 바꿔줌
            */
+          if (await that.gameIsEnded(roomId)) {
+            return;
+          }
 
           const players = await that.gameEventService.findPlayers(roomId);
           const ballotBox = await that.gameEventService.getBallotBox(
@@ -251,6 +258,9 @@ export class GameGateway
            * 처형됐다면 승리 조건 검사
            * turn night로 변경
            */
+          if (await that.gameIsEnded(roomId)) {
+            return;
+          }
           const result = await that.gameEventService.getPunishVote(roomId, day);
           const punishBallotBox = PunishBallotBox.of(result);
           const players = await that.gameEventService.findPlayers(roomId);
@@ -338,6 +348,9 @@ export class GameGateway
           /**
            * 밤 능력 종합 후 게임 승리 조건 검사한 후 타이머 실행한다.
            */
+          if (await that.gameIsEnded(roomId)) {
+            return;
+          }
           const result = await that.gameEventService.getSkillResult(
             roomId,
             day,
@@ -490,6 +503,7 @@ export class GameGateway
   async handleLeave(@ConnectedSocket() socket: AuthenticatedSocket) {
     const { roomId } = socket.data;
     socket.data = null;
+    this.logger.log('leave event 발생');
     await this.leave(
       roomId,
       `${socket.nsp.name}-${roomId}`,
@@ -536,9 +550,7 @@ export class GameGateway
   }
   afterInit(server: any) {}
   async leave(roomId: number, socketRoom: string, playerId: number) {
-    //Todo 게임이 끝나고 나갈 때도 소켓이 끊길텐데 처리를 어떻게 할 것 인가.
-    const info = await this.gameEventService.getGameInfo(roomId);
-    if (!info) {
+    if (await this.gameIsEnded(roomId)) {
       return;
     }
     await this.gameEventService.leave(roomId, playerId);
@@ -548,11 +560,19 @@ export class GameGateway
       players,
       roomId,
     );
+    this.logger.log(`leave result: ${JSON.stringify(result)}`);
     if (result.win) {
       setTimeout(() => {
-        this.server.to(`${socketRoom}-${roomId}`).emit(GameEvent.END, result);
+        this.server.to(socketRoom).emit(GameEvent.END, result);
       }, 1000);
       await this.gameEventService.deleteGame(roomId);
     }
+  }
+  async gameIsEnded(roomId: number): Promise<boolean> {
+    const info = await this.gameEventService.getGameInfo(roomId);
+    if (!info) {
+      return true;
+    }
+    return false;
   }
 }

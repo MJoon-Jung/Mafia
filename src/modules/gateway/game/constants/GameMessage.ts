@@ -29,4 +29,10 @@ export class GameMessage {
   public static NIGHT_POLICE_SKILL(nickname: string, job: string): string {
     return `${nickname}님의 역할은 ${job}입니다.`;
   }
+  public static CITIZEN_WIN(): string {
+    return '시민팀이 승리하였습니다.';
+  }
+  public static MAFIA_WIN(): string {
+    return '마피아팀이 승리하였습니다.';
+  }
 }
