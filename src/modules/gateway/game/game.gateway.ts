@@ -449,6 +449,9 @@ export class GameGateway
     }
     this.logger.log(`mafia event playerVideoNum: ${data.playerVideoNum}`);
     if (!data.playerVideoNum) return;
+    if (players[data.playerVideoNum - 1].die) {
+      throw new WsException('이미 죽은 플레이어입니다.');
+    }
     const day = await this.gameEventService.getDay(roomId);
     await this.gameEventService.setMafiaKill(roomId, day, data.playerVideoNum);
   }
@@ -470,6 +473,9 @@ export class GameGateway
     }
     this.logger.log(`doctor event playerVideoNum: ${data.playerVideoNum}`);
     if (!data.playerVideoNum) return;
+    if (players[data.playerVideoNum - 1].die) {
+      throw new WsException('이미 죽은 플레이어입니다.');
+    }
     const day = await this.gameEventService.getDay(roomId);
     await this.gameEventService.setDoctorSkill(
       roomId,
