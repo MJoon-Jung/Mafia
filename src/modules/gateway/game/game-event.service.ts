@@ -29,7 +29,6 @@ export class GameEventService {
     );
   }
   async leave(roomId: number, playerId: number) {
-    this.logger.log(`gameEventService leave event leave`);
     const players = await this.findPlayers(roomId);
     const player = players.find((player) => player.id === playerId);
     this.logger.log(
@@ -67,8 +66,12 @@ export class GameEventService {
     playerVideoNum: Nullable<number>;
     message: string;
   }> {
+    this.logger.log('get skill result');
     const doctorSkill: number = await this.getDoctorSkill(roomId, day);
     const mafiaSkill: number = await this.getMafiaSkill(roomId, day);
+    this.logger.log(
+      `get skill result doctor: ${doctorSkill} mafia: ${mafiaSkill}`,
+    );
     if (!mafiaSkill) {
       return {
         die: false,

@@ -119,12 +119,9 @@ export class GameGateway
       } else {
         if (player.id !== maybePlayer.id) player.job = null;
       }
-      return player;
     });
 
-    socket
-      .to(`${socket.nsp.name}-${roomId}`)
-      .emit(GameEvent.START, { players });
+    this.server.in(`${socket.id}`).emit(GameEvent.START, { players });
 
     if (count < players.length) return;
 
@@ -355,6 +352,9 @@ export class GameGateway
             roomId,
             day,
           );
+          that.logger.log(
+            `night event skill result: ${JSON.stringify(result)}`,
+          );
           that.server.to(socketRoom).emit(GameEvent.SKILL, result);
 
           if (result.die) {
@@ -392,7 +392,7 @@ export class GameGateway
   @SubscribeMessage(GameEvent.VOTE)
   async handleGameVote(
     @ConnectedSocket() socket: AuthenticatedSocket,
-    @MessageBody() data: { roomId: number; playerVideoNum: number },
+    @MessageBody() data: { playerVideoNum: number },
   ) {
     const { roomId } = socket.data;
     const players = await this.gameEventService.findPlayers(roomId);
@@ -414,7 +414,7 @@ export class GameGateway
   @SubscribeMessage(GameEvent.PUNISH)
   async handleGamePunish(
     @ConnectedSocket() socket: AuthenticatedSocket,
-    @MessageBody() data: { roomId: number; agree: boolean },
+    @MessageBody() data: { agree: boolean },
   ) {
     const { roomId } = socket.data;
     const players = await this.gameEventService.findPlayers(roomId);
@@ -432,7 +432,7 @@ export class GameGateway
   @SubscribeMessage(GameEvent.MAFIA)
   async handleGameMafiaSkill(
     @ConnectedSocket() socket: AuthenticatedSocket,
-    @MessageBody() data: { roomId: number; playerVideoNum: number },
+    @MessageBody() data: { playerVideoNum: number },
   ) {
     const { roomId } = socket.data;
     const players = await this.gameEventService.findPlayers(roomId);
@@ -445,6 +445,7 @@ export class GameGateway
     if (maybePlayer.job !== EnumGameRole.MAFIA) {
       throw new WsException('마피아의 능력을 사용할 권한이 없습니다.');
     }
+    this.logger.log(`mafia event playerVideoNum: ${data.playerVideoNum}`);
     if (!data.playerVideoNum) return;
     const day = await this.gameEventService.getDay(roomId);
     await this.gameEventService.setMafiaKill(roomId, day, data.playerVideoNum);
@@ -452,7 +453,7 @@ export class GameGateway
   @SubscribeMessage(GameEvent.DOCTOR)
   async handleGameDoctorSkill(
     @ConnectedSocket() socket: AuthenticatedSocket,
-    @MessageBody() data: { roomId: number; playerVideoNum: number },
+    @MessageBody() data: { playerVideoNum: number },
   ) {
     const { roomId } = socket.data;
     const players = await this.gameEventService.findPlayers(roomId);
@@ -465,6 +466,7 @@ export class GameGateway
     if (maybePlayer.job !== EnumGameRole.DOCTOR) {
       throw new WsException('의사의 능력을 사용할 권한이 없습니다.');
     }
+    this.logger.log(`doctor event playerVideoNum: ${data.playerVideoNum}`);
     if (!data.playerVideoNum) return;
     const day = await this.gameEventService.getDay(roomId);
     await this.gameEventService.setDoctorSkill(
@@ -476,7 +478,7 @@ export class GameGateway
   @SubscribeMessage(GameEvent.POLICE)
   async handleGamePoliceSkill(
     @ConnectedSocket() socket: AuthenticatedSocket,
-    @MessageBody() data: { roomId: number; playerVideoNum: number },
+    @MessageBody() data: { playerVideoNum: number },
   ) {
     const { roomId } = socket.data;
     const players = await this.gameEventService.findPlayers(roomId);
@@ -489,6 +491,7 @@ export class GameGateway
     if (maybePlayer.job !== EnumGameRole.POLICE) {
       throw new WsException('경찰의 능력을 사용할 권한이 없습니다.');
     }
+    this.logger.log(`police event playerVideoNum: ${data.playerVideoNum}`);
 
     if (!data.playerVideoNum) return;
 
