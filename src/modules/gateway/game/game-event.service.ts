@@ -284,7 +284,20 @@ export class GameEventService {
     );
   }
 
+  private lessThanThreePlayer(
+    jobs: EnumGameRole[],
+    playerCount: number,
+  ): EnumGameRole[] {
+    jobs.push(EnumGameRole.CITIZEN);
+    if (playerCount === 2) {
+      jobs.push(EnumGameRole.MAFIA);
+    }
+    return jobs;
+  }
   setInitialPlayerJob(playerCount: number): EnumGameRole[] {
+    if (playerCount < 3) {
+      return this.shuffle(this.lessThanThreePlayer([], playerCount));
+    }
     return this.shuffle(this.initalJobData([], playerCount));
   }
   private initalJobData(

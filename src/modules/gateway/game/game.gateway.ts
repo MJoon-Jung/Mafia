@@ -29,6 +29,7 @@ import { RedisHashesField } from 'src/modules/gateway/common/RedisHashesField';
 import { PunishBallotBox } from 'src/modules/gateway/game/PunishBallotBox';
 import { GameMessage } from 'src/modules/gateway/game/constants/GameMessage';
 import { GameTime } from 'src/modules/gateway/game/constants/GameTime';
+import { BallotBox } from 'src/modules/gateway/game/BallotBox';
 
 dayjs.locale('ko');
 dayjs.extend(customParseFormat);
@@ -195,7 +196,7 @@ export class GameGateway
           }
 
           const players = await that.gameEventService.findPlayers(roomId);
-          const ballotBox = await that.gameEventService.getBallotBox(
+          const ballotBox: BallotBox = await that.gameEventService.getBallotBox(
             roomId,
             day,
             players.length,
@@ -213,12 +214,12 @@ export class GameGateway
           ) {
             const votedPlayer: Player =
               players[ballotBox.electedPlayerVideoNum() - 1];
-            if (votedPlayer.die)
-              throw new WsException('이미 죽은 플레이어입니다.');
             that.logger.log(
               '============votedPlayer============' +
                 JSON.stringify(votedPlayer),
             );
+            if (votedPlayer.die)
+              throw new WsException('이미 죽은 플레이어입니다.');
 
             await that.gameEventService.setPunishedPlayer(
               roomId,

@@ -1,4 +1,6 @@
-type VotingResult = { [key: number]: number };
+import { Logger } from '@nestjs/common';
+
+type VotingResult = { [key: string]: number };
 type Optional<T> = T | undefined;
 export class BallotBox {
   constructor(private votingResult: VotingResult) {}
@@ -6,9 +8,10 @@ export class BallotBox {
     this.votingResult[playerVideoNum]++;
   }
   public electedPlayerVideoNum(): Optional<number> {
-    for (const playerVideoNum in Object.keys(this.votingResult)) {
-      if (this.votingResult[playerVideoNum] === this.highestNumberOfVotes())
+    for (const playerVideoNum in this.votingResult) {
+      if (this.votingResult[playerVideoNum] === this.highestNumberOfVotes()) {
         return parseInt(playerVideoNum, 10);
+      }
     }
   }
   public getVotingResult(): VotingResult {
@@ -16,9 +19,6 @@ export class BallotBox {
   }
   private highestNumberOfVotes(): number {
     return Math.max(...Object.values(this.votingResult));
-  }
-  private numberOfPlayer(): number {
-    return Object.keys(this.votingResult).length;
   }
   public majorityVote(players: number): boolean {
     return this.highestNumberOfVotes() >= Math.round(players / 2);
