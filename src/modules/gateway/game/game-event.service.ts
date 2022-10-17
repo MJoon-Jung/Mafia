@@ -84,13 +84,15 @@ export class GameEventService {
       return {
         die: false,
         playerVideoNum: doctorSkill,
-        message: GameMessage.NIGHT_DOCTOR_SKILL(players[doctorSkill].nickname),
+        message: GameMessage.NIGHT_DOCTOR_SKILL(
+          players[doctorSkill - 1].nickname,
+        ),
       };
     }
     return {
       die: true,
       playerVideoNum: mafiaSkill,
-      message: GameMessage.NIGHT_MAFIA_SKILL(players[mafiaSkill].nickname),
+      message: GameMessage.NIGHT_MAFIA_SKILL(players[mafiaSkill - 1].nickname),
     };
   }
   async getDoctorSkill(roomId: number, day: number): Promise<number> {

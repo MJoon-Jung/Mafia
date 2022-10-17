@@ -362,8 +362,8 @@ export class GameGateway
           if (result.die) {
             const players = await that.gameEventService.findPlayers(roomId);
             // 죽음 처리
-            players.forEach((player) => {
-              if (player.id === result.playerVideoNum) {
+            players.forEach((player, idx) => {
+              if (idx === result.playerVideoNum - 1) {
                 player.die = true;
               }
             });
@@ -496,11 +496,14 @@ export class GameGateway
     this.logger.log(`police event playerVideoNum: ${data.playerVideoNum}`);
 
     if (!data.playerVideoNum) return;
+    if (players[data.playerVideoNum - 1].die) {
+      throw new WsException('이미 죽은 플레이어입니다.');
+    }
 
     this.server.in(socket.id).emit(GameEvent.POLICE, {
       message: GameMessage.NIGHT_POLICE_SKILL(
-        players[data.playerVideoNum].nickname,
-        players[data.playerVideoNum].job,
+        players[data.playerVideoNum - 1].nickname,
+        players[data.playerVideoNum - 1].job,
       ),
     });
   }
