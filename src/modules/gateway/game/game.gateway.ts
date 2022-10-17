@@ -313,19 +313,18 @@ export class GameGateway
             }
             that.server.to(socketRoom).emit(GameEvent.PUNISH, data);
             // 승리 조건 검사 후 게임 END
-            //Todo 탈주자 처리 다시 생각
-            const result =
-              await that.gameEventService.haveNecessaryConditionOfWinning(
-                players,
-                roomId,
-              );
-            if (result.win) {
-              setTimeout(() => {
-                that.server.to(socketRoom).emit(GameEvent.END, result);
-              }, 2000);
-              await that.gameEventService.deleteGame(roomId);
-              return;
-            }
+            // const result =
+            //   await that.gameEventService.haveNecessaryConditionOfWinning(
+            //     players,
+            //     roomId,
+            //   );
+            // if (result.win) {
+            //   setTimeout(() => {
+            //     that.server.to(socketRoom).emit(GameEvent.END, result);
+            //   }, 2000);
+            //   await that.gameEventService.deleteGame(roomId);
+            //   return;
+            // }
           } else {
             data = {
               result: false,
@@ -376,18 +375,18 @@ export class GameGateway
             });
             that.gameEventService.setPlayers(roomId, players);
             // 승리 조건 검사
-            const data =
-              await that.gameEventService.haveNecessaryConditionOfWinning(
-                players,
-                roomId,
-              );
-            if (data.win) {
-              setTimeout(() => {
-                that.server.to(socketRoom).emit(GameEvent.END, data);
-              }, 2000);
-              await that.gameEventService.deleteGame(roomId);
-              return;
-            }
+            // const data =
+            //   await that.gameEventService.haveNecessaryConditionOfWinning(
+            //     players,
+            //     roomId,
+            //   );
+            // if (data.win) {
+            //   setTimeout(() => {
+            //     that.server.to(socketRoom).emit(GameEvent.END, data);
+            //   }, 2000);
+            //   await that.gameEventService.deleteGame(roomId);
+            //   return;
+            // }
           }
           await that.gameEventService.setDay(roomId);
           await that.gameEventService.setStatus(roomId, GameTurn.MEETING);
