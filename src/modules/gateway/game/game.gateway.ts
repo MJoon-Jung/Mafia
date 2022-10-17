@@ -85,8 +85,9 @@ export class GameGateway
     });
     await this.gameEventService.setPlayers(roomId, players);
     await this.gameRepository.setRole(players);
-    // 굳이 보낼 필요 있나?
-    this.server.to(`${socket.nsp.name}-${roomId}`).emit(GameEvent.JOIN);
+    setTimeout(() => {
+      this.server.to(`${socket.nsp.name}-${roomId}`).emit(GameEvent.JOIN);
+    }, 3000);
   }
 
   @SubscribeMessage(GameEvent.START)
@@ -124,8 +125,9 @@ export class GameGateway
     this.server.in(`${socket.id}`).emit(GameEvent.START, { players });
 
     if (count < players.length) return;
-
-    await this.startTimer(roomId, `${socket.nsp.name}-${roomId}`);
+    setTimeout(async () => {
+      await this.startTimer(roomId, `${socket.nsp.name}-${roomId}`);
+    }, 3000);
   }
   async startTimer(roomId: number, socketRoom: string) {
     /**
@@ -495,7 +497,7 @@ export class GameGateway
 
     if (!data.playerVideoNum) return;
 
-    this.server.to(socket.id).emit(GameEvent.POLICE, {
+    this.server.in(socket.id).emit(GameEvent.POLICE, {
       message: GameMessage.NIGHT_POLICE_SKILL(
         players[data.playerVideoNum].nickname,
         players[data.playerVideoNum].job,
