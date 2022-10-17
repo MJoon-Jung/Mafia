@@ -116,9 +116,15 @@ export class GameGateway
        * 다른 직업은 자신 제외 직업 정보 null
        */
       if (maybePlayer.job === EnumGameRole.MAFIA) {
-        if (player.job !== EnumGameRole.MAFIA) player.job = null;
+        if (player.job !== EnumGameRole.MAFIA) {
+          player.job = null;
+          player.team = null;
+        }
       } else {
-        if (player.id !== maybePlayer.id) player.job = null;
+        if (player.id !== maybePlayer.id) {
+          player.job = null;
+          player.team = null;
+        }
       }
     });
 
