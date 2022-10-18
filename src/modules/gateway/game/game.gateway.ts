@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/ban-types */
-import { Inject, Logger, UseGuards } from '@nestjs/common';
+import { Inject, Logger, UseFilters, UseGuards } from '@nestjs/common';
 import {
   ConnectedSocket,
   MessageBody,
@@ -9,7 +9,6 @@ import {
   SubscribeMessage,
   WebSocketGateway,
   WebSocketServer,
-  WsException,
 } from '@nestjs/websockets';
 import { Server } from 'socket.io';
 import { WsAuthenticatedGuard } from '../guards/ws.authenticated.guard';
@@ -30,11 +29,20 @@ import { PunishBallotBox } from 'src/modules/gateway/game/PunishBallotBox';
 import { GameMessage } from 'src/modules/gateway/game/constants/GameMessage';
 import { GameTime } from 'src/modules/gateway/game/constants/GameTime';
 import { BallotBox } from 'src/modules/gateway/game/BallotBox';
+import {
+  ADeadPlayerException,
+  ForbiddenDoctorSkillException,
+  ForbiddenMafiaSkillException,
+  ForbiddenPoliceSkillException,
+  IsNotPlayerException,
+} from 'src/modules/gateway/game/exception';
+import { AllWsExceptionsFilter } from 'src/modules/gateway/game/exception/AllWsExceptionsFilter';
 
 dayjs.locale('ko');
 dayjs.extend(customParseFormat);
 
 @UseGuards(WsAuthenticatedGuard)
+@UseFilters(new AllWsExceptionsFilter())
 @WebSocketGateway({
   transports: ['websocket'],
   cors: { origin: '*', credentials: true },
@@ -62,7 +70,7 @@ export class GameGateway
       (player) => player.id === socket.request.user.profile.id,
     );
     if (!maybePlayer) {
-      throw new WsException('게임 플레이어가 아닙니다');
+      throw new IsNotPlayerException();
     }
     await socket.join(`${socket.nsp.name}-${roomId}`);
     socket.data['roomId'] = roomId;
@@ -104,7 +112,7 @@ export class GameGateway
       (player) => player.id === socket.request.user.profile.id,
     );
     if (!maybePlayer) {
-      throw new WsException('게임 플레이어가 아닙니다');
+      throw new IsNotPlayerException();
     }
     const count = await this.redisService.hincrby(
       RedisHashesKey.game(roomId),
@@ -218,8 +226,7 @@ export class GameGateway
               '============votedPlayer============' +
                 JSON.stringify(votedPlayer),
             );
-            if (votedPlayer.die)
-              throw new WsException('이미 죽은 플레이어입니다.');
+            if (votedPlayer.die) throw new ADeadPlayerException();
 
             await that.gameEventService.setPunishedPlayer(
               roomId,
@@ -408,13 +415,13 @@ export class GameGateway
       (player) => player.id === socket.request.user.profile.id,
     );
     if (!maybePlayer) {
-      throw new WsException('게임 플레이어가 아닙니다');
+      throw new IsNotPlayerException();
     }
     const votedPlayer = players.find(
       (_, idx) => idx === data.playerVideoNum - 1,
     );
     if (votedPlayer.die) {
-      throw new WsException('이미 죽은 플레이어입니다.');
+      throw new ADeadPlayerException();
     }
     const day = await this.gameEventService.getDay(roomId);
     await this.gameEventService.setVote(roomId, day, data.playerVideoNum);
@@ -430,7 +437,7 @@ export class GameGateway
       (player) => player.id === socket.request.user.profile.id,
     );
     if (!maybePlayer) {
-      throw new WsException('게임 플레이어가 아닙니다');
+      throw new IsNotPlayerException();
     }
     const day = await this.gameEventService.getDay(roomId);
     if (data.agree) {
@@ -448,15 +455,15 @@ export class GameGateway
       (player) => player.id === socket.request.user.profile.id,
     );
     if (!maybePlayer) {
-      throw new WsException('게임 플레이어가 아닙니다');
+      throw new IsNotPlayerException();
     }
     if (maybePlayer.job !== EnumGameRole.MAFIA) {
-      throw new WsException('마피아의 능력을 사용할 권한이 없습니다.');
+      throw new ForbiddenMafiaSkillException();
     }
     this.logger.log(`mafia event playerVideoNum: ${data.playerVideoNum}`);
     if (!data.playerVideoNum) return;
     if (players[data.playerVideoNum - 1].die) {
-      throw new WsException('이미 죽은 플레이어입니다.');
+      throw new ADeadPlayerException();
     }
     const day = await this.gameEventService.getDay(roomId);
     await this.gameEventService.setMafiaKill(roomId, day, data.playerVideoNum);
@@ -472,15 +479,15 @@ export class GameGateway
       (player) => player.id === socket.request.user.profile.id,
     );
     if (!maybePlayer) {
-      throw new WsException('게임 플레이어가 아닙니다');
+      throw new IsNotPlayerException();
     }
     if (maybePlayer.job !== EnumGameRole.DOCTOR) {
-      throw new WsException('의사의 능력을 사용할 권한이 없습니다.');
+      throw new ForbiddenDoctorSkillException();
     }
     this.logger.log(`doctor event playerVideoNum: ${data.playerVideoNum}`);
     if (!data.playerVideoNum) return;
     if (players[data.playerVideoNum - 1].die) {
-      throw new WsException('이미 죽은 플레이어입니다.');
+      throw new ADeadPlayerException();
     }
     const day = await this.gameEventService.getDay(roomId);
     await this.gameEventService.setDoctorSkill(
@@ -500,16 +507,16 @@ export class GameGateway
       (player) => player.id === socket.request.user.profile.id,
     );
     if (!maybePlayer) {
-      throw new WsException('게임 플레이어가 아닙니다');
+      throw new IsNotPlayerException();
     }
     if (maybePlayer.job !== EnumGameRole.POLICE) {
-      throw new WsException('경찰의 능력을 사용할 권한이 없습니다.');
+      throw new ForbiddenPoliceSkillException();
     }
     this.logger.log(`police event playerVideoNum: ${data.playerVideoNum}`);
 
     if (!data.playerVideoNum) return;
     if (players[data.playerVideoNum - 1].die) {
-      throw new WsException('이미 죽은 플레이어입니다.');
+      throw new ADeadPlayerException();
     }
 
     this.server.in(socket.id).emit(GameEvent.POLICE, {

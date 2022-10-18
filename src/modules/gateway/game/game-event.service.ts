@@ -11,6 +11,7 @@ import { BallotBox } from 'src/modules/gateway/game/BallotBox';
 import { RedisHashesField } from 'src/modules/gateway/common/RedisHashesField';
 import { RedisHashesKey } from 'src/modules/gateway/common/RedisHashesKey';
 import { GameMessage } from 'src/modules/gateway/game/constants/GameMessage';
+import { IsNotPlayerException } from 'src/modules/gateway/game/exception/IsNotPlayerException';
 dayjs.locale('ko');
 
 type Nullable<T> = T | null;
@@ -271,7 +272,7 @@ export class GameEventService {
       RedisHashesField.player(),
     );
     if (!maybePlayers || !maybePlayers.length) {
-      throw new WsException('게임 플레이어가 아닙니다');
+      throw new IsNotPlayerException();
     }
     return maybePlayers;
   }
