@@ -423,6 +423,9 @@ export class GameGateway
     if (votedPlayer.die) {
       throw new ADeadPlayerException();
     }
+    this.logger.log(
+      `${socket.request.user.profile.nickname}님이 playerVideoNum: ${data.playerVideoNum}를 지목하였습니다.`,
+    );
     const day = await this.gameEventService.getDay(roomId);
     await this.gameEventService.setVote(roomId, day, data.playerVideoNum);
   }

@@ -249,8 +249,11 @@ export class GameEventService {
         RedisHashesKey.game(roomId),
         RedisHashesField.vote(day, i),
       );
-      result[i] = count;
+      if (count) {
+        result[i] = count;
+      }
     }
+    this.logger.log(`========result: ${JSON.stringify(result)}`);
     return BallotBox.from(result);
   }
   async getGameTurn(roomId: number): Promise<GameTurn> {
