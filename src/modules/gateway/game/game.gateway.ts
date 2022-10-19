@@ -521,6 +521,7 @@ export class GameGateway
     }
 
     this.server.in(socket.id).emit(GameEvent.POLICE, {
+      player: players[data.playerVideoNum - 1],
       message: GameMessage.NIGHT_POLICE_SKILL(
         players[data.playerVideoNum - 1].nickname,
         players[data.playerVideoNum - 1].job,
