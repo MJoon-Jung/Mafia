@@ -1,5 +1,3 @@
-import { Logger } from '@nestjs/common';
-
 type VotingResult = { [key: string]: number };
 type Optional<T> = T | undefined;
 export class BallotBox {
