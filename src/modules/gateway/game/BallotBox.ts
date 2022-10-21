@@ -22,7 +22,7 @@ export class BallotBox {
     if (!Object.keys(this.votingResult).length) {
       return false;
     }
-    return this.highestNumberOfVotes() >= Math.round(players / 2);
+    return this.highestNumberOfVotes() > Math.floor(players / 2);
   }
   public tieTheVote(): boolean {
     if (!Object.keys(this.votingResult).length) {
