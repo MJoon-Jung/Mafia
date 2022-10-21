@@ -331,7 +331,7 @@ export class GameGateway
             if (result.win) {
               setTimeout(() => {
                 that.server.to(socketRoom).emit(GameEvent.END, result);
-              }, 2000);
+              }, 4000);
               await that.gameEventService.deleteGame(roomId);
               return;
             }
@@ -393,7 +393,7 @@ export class GameGateway
             if (data.win) {
               setTimeout(() => {
                 that.server.to(socketRoom).emit(GameEvent.END, data);
-              }, 2000);
+              }, 4000);
               await that.gameEventService.deleteGame(roomId);
               return;
             }
@@ -587,8 +587,8 @@ export class GameGateway
     if (await this.gameIsEnded(roomId)) {
       return;
     }
-    const playerVideoNum = await this.gameEventService.leave(roomId, playerId);
-    this.server.to(socketRoom).emit(GameEvent.LEAVE, { playerVideoNum });
+    const data = await this.gameEventService.leave(roomId, playerId);
+    this.server.to(socketRoom).emit(GameEvent.LEAVE, data);
     const players = await this.gameEventService.findPlayers(roomId);
     const result = await this.gameEventService.haveNecessaryConditionOfWinning(
       players,

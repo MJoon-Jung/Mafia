@@ -35,4 +35,7 @@ export class GameMessage {
   public static MAFIA_WIN(): string {
     return '마피아팀이 승리하였습니다.';
   }
+  public static LEAVE_PLAYER(nickname: string): string {
+    return `${nickname}님이 나가셨습니다.`;
+  }
 }

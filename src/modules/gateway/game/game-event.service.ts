@@ -29,7 +29,10 @@ export class GameEventService {
       RedisHashesField.roomInfo(),
     );
   }
-  async leave(roomId: number, playerId: number): Promise<number> {
+  async leave(
+    roomId: number,
+    playerId: number,
+  ): Promise<{ playerVideoNum: number; message: string }> {
     const players = await this.findPlayers(roomId);
     let leavePlayer: Player;
     let playerVideoNum: number;
@@ -48,7 +51,10 @@ export class GameEventService {
     await this.setPlayers(roomId, players);
     await this.setEscapePlayer(roomId, playerId);
     await this.gameRepository.leave(leavePlayer);
-    return playerVideoNum;
+    return {
+      playerVideoNum,
+      message: GameMessage.LEAVE_PLAYER(leavePlayer.nickname),
+    };
   }
   async setEscapePlayer(roomId: number, playerId: number) {
     const escapePlayers = await this.getEscapePlayer(roomId);
