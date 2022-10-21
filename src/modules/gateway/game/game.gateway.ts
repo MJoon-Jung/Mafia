@@ -75,12 +75,14 @@ export class GameGateway
     await socket.join(`${socket.nsp.name}-${roomId}`);
     socket.data['roomId'] = roomId;
 
+    this.logger.log(`join count`);
     const count = await this.redisService.hincrby(
       RedisHashesKey.game(roomId),
       RedisHashesField.joinCount(),
     );
     if (count < players.length) return;
 
+    this.logger.log(`set day`);
     await this.gameEventService.setDay(roomId);
     await this.gameEventService.setStatus(roomId, GameTurn.MEETING);
     const jobs = this.gameEventService.setInitialPlayerJob(count);
@@ -114,6 +116,7 @@ export class GameGateway
     if (!maybePlayer) {
       throw new IsNotPlayerException();
     }
+    this.logger.log(`start count`);
     const count = await this.redisService.hincrby(
       RedisHashesKey.game(roomId),
       RedisHashesField.startCount(),
@@ -584,8 +587,8 @@ export class GameGateway
     if (await this.gameIsEnded(roomId)) {
       return;
     }
-    await this.gameEventService.leave(roomId, playerId);
-    this.server.to(socketRoom).emit(GameEvent.LEAVE, { playerId });
+    const playerVideoNum = await this.gameEventService.leave(roomId, playerId);
+    this.server.to(socketRoom).emit(GameEvent.LEAVE, { playerVideoNum });
     const players = await this.gameEventService.findPlayers(roomId);
     const result = await this.gameEventService.haveNecessaryConditionOfWinning(
       players,
