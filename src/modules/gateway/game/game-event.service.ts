@@ -37,7 +37,7 @@ export class GameEventService {
       if (player.id === playerId) {
         player.die = true;
         playerVideoNum = idx + 1;
-        player = player;
+        leavePlayer = player;
       }
     });
     this.logger.log(
