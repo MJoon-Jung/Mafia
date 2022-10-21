@@ -573,8 +573,8 @@ export class GameGateway
     );
   }
   async handleDisconnect(@ConnectedSocket() socket: AuthenticatedSocket) {
+    if (!socket.data?.roomId) return;
     const { roomId } = socket.data;
-    if (!roomId) return;
     socket.data = null;
     await this.leave(
       roomId,
