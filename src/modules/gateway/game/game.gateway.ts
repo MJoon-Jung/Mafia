@@ -166,9 +166,12 @@ export class GameGateway
       setTimeout(
         async function run(that: GameGateway) {
           if (timer-- > 0) {
-            that.server
-              .to(socketRoom)
-              .emit(GameEvent.TIMER, { timer, status: turn, day });
+            that.server.to(socketRoom).emit(GameEvent.TIMER, {
+              timer,
+              status: turn,
+              day,
+              totalTime: GameTime.MEETING_TIME,
+            });
             setTimeout(run, 1000, that);
             return;
           }
@@ -193,9 +196,12 @@ export class GameGateway
       setTimeout(
         async function run(that: GameGateway) {
           if (timer-- > 0) {
-            that.server
-              .to(socketRoom)
-              .emit(GameEvent.TIMER, { timer, status: turn, day });
+            that.server.to(socketRoom).emit(GameEvent.TIMER, {
+              timer,
+              status: turn,
+              day,
+              totalTime: GameTime.VOTE_TIME,
+            });
             setTimeout(run, 1000, that);
             return;
           }
@@ -262,9 +268,12 @@ export class GameGateway
       setTimeout(
         async function run(that: GameGateway) {
           if (timer-- > 0) {
-            that.server
-              .to(socketRoom)
-              .emit(GameEvent.TIMER, { timer, status: turn, day });
+            that.server.to(socketRoom).emit(GameEvent.TIMER, {
+              timer,
+              status: turn,
+              day,
+              totalTime: GameTime.PUNISH_TIME,
+            });
             setTimeout(run, 1000, that);
             return;
           }
@@ -354,9 +363,12 @@ export class GameGateway
       setTimeout(
         async function run(that: GameGateway) {
           if (timer-- > 0) {
-            that.server
-              .to(socketRoom)
-              .emit(GameEvent.TIMER, { timer, status: turn, day });
+            that.server.to(socketRoom).emit(GameEvent.TIMER, {
+              timer,
+              status: turn,
+              day,
+              totalTime: GameTime.NIGHT_TIME,
+            });
             setTimeout(run, 1000, that);
             return;
           }
