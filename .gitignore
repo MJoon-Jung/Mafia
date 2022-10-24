@@ -49,7 +49,6 @@ todo.md
 .env.development
 .env.production
 .env.testing
-.env.*
 
 # shell script
 push.sh

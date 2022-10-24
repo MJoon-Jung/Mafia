@@ -1,73 +1,46 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo_text.svg" width="320" alt="Nest Logo" /></a>
-</p>
+## 프로젝트: Fafia(Face + Mafia)
+- 웹에서 서로의 얼굴을 보면서 플레이하는 마피아 게임입니다.
+- 서비스에서 사회자 역할을 대신하여 게임을 진행합니다.
+- 게임 진행 중 플레이어 지목할 때 생동감을 살리기 위해 카메라 인식을 도입하여 직접 손을 움직여 플레이합니다.
+- 상대방의 직업을 메모할 수 있는 기능을 이용하면 다른 플레이어의 의심되는 직업 필터를 설정할 수 있습니다.
+- 오프라인에서는 밤(게임 턴)에 다른 사람의 소리가 들리는 불편한 점을 해소했습니다.
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+Frontend Repository<br/>
+- https://github.com/Mirai1412/Capstone-Front
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://coveralls.io/github/nestjs/nest?branch=master" target="_blank"><img src="https://coveralls.io/repos/github/nestjs/nest/badge.svg?branch=master#9" alt="Coverage" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+Backend Repository<br/>
+- https://github.com/MJoon-Jung/Mafia.git
 
-## Description
+### 사용 기술
+```
+TypeScript, JavaScript
+nuxt.js, nest.js, socket.io
+mediapipe, tensorflow.js
+MySQL, redis
+AWS, Docker, Github, Github Actions
+```
+<br/>
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+1. 프로젝트 준비 <br/> 
 
-## Installation
-
-```bash
-$ npm install
+mysql, redis, env 셋팅
+```
+git clone https://github.com/MJoon-Jung/Mafia.git
+cd ./Mafia
+cp .env.example .env.development
 ```
 
-## Running the app
-
-```bash
-# development
-$ npm run start
-
-# watch mode
-$ npm run start:dev
-
-# production mode
-$ npm run start:prod
+2. 설치
+```
+npm install
 ```
 
-## Test
-
-```bash
-# unit tests
-$ npm run test
-
-# e2e tests
-$ npm run test:e2e
-
-# test coverage
-$ npm run test:cov
+3. 데이터베이스 초기 데이터 셋팅
+```
+npm run seed:run
 ```
 
-## Support
-
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
-
-## Stay in touch
-
-- Author - [Kamil Myśliwiec](https://kamilmysliwiec.com)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
-
-## License
-
-Nest is [MIT licensed](LICENSE).
+4. 서버 시작
+```
+npm run start
+```
