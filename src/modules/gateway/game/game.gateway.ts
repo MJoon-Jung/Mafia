@@ -306,7 +306,7 @@ export class GameGateway
                 playerVideoNum = idx + 1;
               }
             });
-            that.gameEventService.setPlayers(roomId, players);
+            await that.gameEventService.setPlayers(roomId, players);
             // socket 데이터 전송
             if (punishedPlayer.job === EnumGameRole.MAFIA) {
               data = {
@@ -383,7 +383,7 @@ export class GameGateway
                 player.die = true;
               }
             });
-            that.gameEventService.setPlayers(roomId, players);
+            await that.gameEventService.setPlayers(roomId, players);
             // 승리 조건 검사
             const data =
               await that.gameEventService.haveNecessaryConditionOfWinning(
