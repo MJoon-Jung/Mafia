@@ -158,8 +158,8 @@ export class GameGateway
      */
     const turn: GameTurn = await this.gameEventService.getGameTurn(roomId);
     const day: number = await this.gameEventService.getDay(roomId);
+    let timer = GameTime.getTime(day, turn);
     if (turn === GameTurn.MEETING) {
-      let timer = GameTime.MEETING_TIME;
       /**
        * 할 거 없음
        */
@@ -183,7 +183,9 @@ export class GameGateway
           }
 
           await that.gameEventService.setStatus(roomId, GameTurn.VOTE);
-          await that.startTimer(roomId, socketRoom);
+          setTimeout(async () => {
+            await that.startTimer(roomId, socketRoom);
+          }, 1500);
         },
         1000,
         this,
@@ -192,7 +194,6 @@ export class GameGateway
       /**
        * 할 거 없음
        */
-      let timer = GameTime.VOTE_TIME;
       setTimeout(
         async function run(that: GameGateway) {
           if (timer-- > 0) {
@@ -255,7 +256,9 @@ export class GameGateway
               message: GameMessage.VOTE_RESULT_NOT_MAJORITY(),
             });
           }
-          await that.startTimer(roomId, socketRoom);
+          setTimeout(async () => {
+            await that.startTimer(roomId, socketRoom);
+          }, 1500);
         },
         1000,
         this,
@@ -264,7 +267,6 @@ export class GameGateway
       /**
        * 할 거 없음
        */
-      let timer = GameTime.PUNISH_TIME;
       setTimeout(
         async function run(that: GameGateway) {
           if (timer-- > 0) {
@@ -353,13 +355,14 @@ export class GameGateway
             that.server.to(socketRoom).emit(GameEvent.PUNISH, data);
           }
           await that.gameEventService.setStatus(roomId, GameTurn.NIGHT);
-          await that.startTimer(roomId, socketRoom);
+          setTimeout(async () => {
+            await that.startTimer(roomId, socketRoom);
+          }, 1500);
         },
         1000,
         this,
       );
     } else if (turn === GameTurn.NIGHT) {
-      let timer = GameTime.NIGHT_TIME;
       setTimeout(
         async function run(that: GameGateway) {
           if (timer-- > 0) {
@@ -412,7 +415,9 @@ export class GameGateway
           }
           await that.gameEventService.setDay(roomId);
           await that.gameEventService.setStatus(roomId, GameTurn.MEETING);
-          await that.startTimer(roomId, socketRoom);
+          setTimeout(async () => {
+            await that.startTimer(roomId, socketRoom);
+          }, 1500);
         },
         1000,
         this,
