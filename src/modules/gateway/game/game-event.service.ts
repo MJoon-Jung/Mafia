@@ -336,12 +336,13 @@ export class GameEventService {
     return jobs;
   }
 
-  // Todo for문 안 i > 1 -> i > 0 으로 바꿔야함 시연때만 사용
+  // Todo first last 필요없음 시연용
   private shuffle(jobs: EnumGameRole[]): EnumGameRole[] {
-    for (let i = jobs.length - 1; i > 1; i--) {
+    const [first, ...last] = jobs;
+    for (let i = last.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
-      [jobs[i], jobs[j]] = [jobs[j], jobs[i]];
+      [last[i], last[j]] = [last[j], last[i]];
     }
-    return jobs;
+    return [first, ...last];
   }
 }
