@@ -170,7 +170,7 @@ export class GameGateway
               timer,
               status: turn,
               day,
-              totalTime: GameTime.MEETING_TIME,
+              totalTime: GameTime.getTime(day, turn),
             });
             setTimeout(run, 1000, that);
             return;
@@ -201,7 +201,7 @@ export class GameGateway
               timer,
               status: turn,
               day,
-              totalTime: GameTime.VOTE_TIME,
+              totalTime: GameTime.getTime(day, turn),
             });
             setTimeout(run, 1000, that);
             return;
@@ -274,7 +274,7 @@ export class GameGateway
               timer,
               status: turn,
               day,
-              totalTime: GameTime.PUNISH_TIME,
+              totalTime: GameTime.getTime(day, turn),
             });
             setTimeout(run, 1000, that);
             return;
@@ -370,7 +370,7 @@ export class GameGateway
               timer,
               status: turn,
               day,
-              totalTime: GameTime.NIGHT_TIME,
+              totalTime: GameTime.getTime(day, turn),
             });
             setTimeout(run, 1000, that);
             return;
