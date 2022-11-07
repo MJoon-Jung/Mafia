@@ -306,15 +306,15 @@ export class GameEventService {
     jobs: EnumGameRole[],
     playerCount: number,
   ): EnumGameRole[] {
-    jobs.push(EnumGameRole.MAFIA);
+    jobs.push(EnumGameRole.CITIZEN);
     if (playerCount === 2) {
-      jobs.push(EnumGameRole.CITIZEN);
+      jobs.push(EnumGameRole.MAFIA);
     }
     return jobs;
   }
   setInitialPlayerJob(playerCount: number): EnumGameRole[] {
     if (playerCount < 3) {
-      return this.lessThanThreePlayer([], playerCount);
+      return this.shuffle(this.lessThanThreePlayer([], playerCount));
     }
     return this.shuffle(this.initalJobData([], playerCount));
   }
@@ -336,9 +336,8 @@ export class GameEventService {
     return jobs;
   }
 
-  // Todo for문 안 i > 1 -> i > 0 으로 바꿔야함 시연때만 사용
   private shuffle(jobs: EnumGameRole[]): EnumGameRole[] {
-    for (let i = jobs.length - 1; i > 1; i--) {
+    for (let i = jobs.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
       [jobs[i], jobs[j]] = [jobs[j], jobs[i]];
     }
